@@ -61,6 +61,11 @@ jobs:
       - name: Build native module
         run: npm run build
       
+      - name: Test native module load (before Jest)
+        run: |
+          echo "Testing if native module can be loaded..."
+          node -e "try { const mod = require('./build/Release/faiss_node.node'); console.log('✅ Native module loaded successfully'); } catch(e) { console.error('❌ Failed to load:', e.message); console.error(e.stack); process.exit(1); }" || exit 1
+      
       - name: Run unit tests
         run: npm run test:ci
       
