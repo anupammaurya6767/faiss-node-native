@@ -273,6 +273,14 @@ jobs:
           node -e "try { const { FaissIndex } = require('./src/js/index.js'); const index = new FaissIndex({ type: 'FLAT_L2', dims: 128 }); console.log('✅ FaissIndex created successfully'); } catch(e) { console.error('❌ Failed to create index:', e.message); console.error(e.stack); process.exit(1); }" || exit 1
       
       - name: Run unit tests
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "=== Running tests with single worker (OpenMP threading safety) ==="
+          # Force single worker to avoid OpenMP threading conflicts
+          npm run test:ci -- --maxWorkers=1
+      
+      - name: Run unit tests (non-macOS)
+        if: matrix.os != 'macos-latest'
         run: npm run test:ci
       
       - name: Run integration tests
