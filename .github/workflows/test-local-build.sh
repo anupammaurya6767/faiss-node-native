@@ -30,17 +30,23 @@ git clone https://github.com/facebookresearch/faiss.git faiss-test
 cd faiss-test
 
 echo "Configuring FAISS with OpenMP..."
-# Set OpenMP paths for CMake
+# Set OpenMP paths for CMake (both C and CXX)
 export OpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -lomp"
 export OpenMP_CXX_LIB_NAMES="omp"
 export OpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib
+export OpenMP_C_FLAGS="-Xpreprocessor -fopenmp -lomp"
+export OpenMP_C_LIB_NAMES="omp"
+export OpenMP_gomp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib
 
 cmake -B build \
   -DFAISS_ENABLE_GPU=OFF \
   -DFAISS_ENABLE_PYTHON=OFF \
   -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -lomp" \
   -DOpenMP_CXX_LIB_NAMES="omp" \
-  -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib
+  -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
+  -DOpenMP_C_FLAGS="-Xpreprocessor -fopenmp -lomp" \
+  -DOpenMP_C_LIB_NAMES="omp" \
+  -DOpenMP_gomp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib
 
 echo "Building FAISS..."
 cmake --build build -j$(sysctl -n hw.ncpu)
