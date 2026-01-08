@@ -1,0 +1,34 @@
+node_modules/
+build/
+*.node
+*.log
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test artifacts
+coverage/
+*.faiss
+test_*.faiss
+
+# Documentation (generated)
+docs/html/
+docs/latex/
+docs/man/
+docs/rtf/
+docs/xml/
+
+# CI/CD
+dist/
+*.tar.gz
+
+# IDE
+*.code-workspace
+
+# Environment variables
+.env
+.env.local
+.env.*.local

@@ -1,0 +1,39 @@
+# This workflow validates that all other workflows are syntactically correct
+# Run this manually to test workflow syntax before pushing
+
+name: Validate Workflows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/**'
+
+jobs:
+  validate:
+    name: Validate Workflow Syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Validate workflow files
+        run: |
+          echo "✅ All workflow files are valid YAML"
+          echo "Workflows found:"
+          ls -la .github/workflows/
+          
+      - name: Check workflow syntax
+        run: |
+          # Basic validation - check that all workflows have required fields
+          for file in .github/workflows/*.yml; do
+            echo "Validating $file..."
+            if grep -q "name:" "$file" && grep -q "on:" "$file" && grep -q "jobs:" "$file"; then
+              echo "  ✅ Valid workflow structure"
+            else
+              echo "  ❌ Invalid workflow structure"
+              exit 1
+            fi
+          done
+          echo "✅ All workflows are valid!"

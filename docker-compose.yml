@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  test:
+    build:
+      context: .
+      target: test
+    volumes:
+      - ./test:/app/test
+      - ./coverage:/app/coverage
+    command: npm run test:ci
+
+  build:
+    build:
+      context: .
+      target: builder
+    volumes:
+      - ./build:/app/build
+
+  docs:
+    build:
+      context: .
+      target: builder
+    volumes:
+      - ./docs:/app/docs
+    command: npm run docs

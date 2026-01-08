@@ -1,0 +1,27 @@
+name: Docker Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  docker-test:
+    name: Docker Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker image
+        run: docker build -t faiss-node:test --target test .
+      
+      - name: Run tests in Docker
+        run: docker run --rm faiss-node:test npm run test:ci
+      
+      - name: Build production image
+        run: docker build -t faiss-node:latest --target production .

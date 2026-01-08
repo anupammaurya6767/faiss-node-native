@@ -1,0 +1,17 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.github
+docs
+coverage
+*.md
+!README.md
+test
+testsprite_tests
+test-server.js
+build
+*.log
+.DS_Store
+.vscode
+.idea

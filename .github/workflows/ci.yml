@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }} (Node ${{ matrix.node-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        node-version: [18, 20, 22]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install cmake libomp openblas faiss
+      
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake libopenblas-dev libomp-dev
+          # FAISS needs to be built from source on Linux
+          git clone https://github.com/facebookresearch/faiss.git /tmp/faiss
+          cd /tmp/faiss
+          cmake -B build -DFAISS_ENABLE_GPU=OFF -DFAISS_ENABLE_PYTHON=OFF .
+          cmake --build build -j$(nproc)
+          sudo cmake --install build
+          cd -
+      
+      - name: Install npm dependencies
+        run: npm ci
+      
+      - name: Build native module
+        run: npm run build
+      
+      - name: Run unit tests
+        run: npm run test:ci
+      
+      - name: Run integration tests
+        run: npm run test:integration
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run linter (if configured)
+        run: |
+          if [ -f ".eslintrc" ] || [ -f ".eslintrc.js" ] || [ -f "eslint.config.js" ]; then
+            npm run lint
+          else
+            echo "No linter configured, skipping..."
+          fi
