@@ -52,7 +52,8 @@
           ],
           "ldflags": [
             "-L/usr/local/lib",
-            "-L/usr/lib"
+            "-L/usr/lib",
+            "-Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu"
           ],
           "cflags_cc": [
             "-std=c++17",

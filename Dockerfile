@@ -23,13 +23,15 @@ RUN git clone https://github.com/facebookresearch/faiss.git /tmp/faiss && \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
         -DCMAKE_CXX_FLAGS="-fopenmp" \
         -DCMAKE_C_FLAGS="-fopenmp" && \
-    cmake --build build -j$(nproc) && \
-    cmake --install build && \
-    # Verify FAISS headers are installed (critical check)
-    test -f /usr/local/include/faiss/impl/FaissAssert.h || (echo "ERROR: FAISS headers not found" && ls -la /usr/local/include/faiss/ && exit 1) && \
-    echo "✅ FAISS headers verified" && \
-    cd / && \
-    rm -rf /tmp/faiss
+          cmake --build build -j$(nproc) && \
+          cmake --install build && \
+          # Update library cache so runtime can find FAISS libraries
+          ldconfig && \
+          # Verify FAISS headers are installed (critical check)
+          test -f /usr/local/include/faiss/impl/FaissAssert.h || (echo "ERROR: FAISS headers not found" && ls -la /usr/local/include/faiss/ && exit 1) && \
+          echo "✅ FAISS headers verified" && \
+          cd / && \
+          rm -rf /tmp/faiss
 
 # Copy package files
 COPY package*.json ./
@@ -53,11 +55,14 @@ FROM builder AS test
 # But .dockerignore was excluding them, so we explicitly copy them
 COPY test ./test
 COPY jest.config.js jest.ci.config.js ./
+# Update library cache after FAISS installation (CRITICAL for runtime)
+RUN ldconfig
 # Set library path for runtime (critical for native module to find libgomp, libfaiss, etc.)
-# Use explicit path without variable expansion to avoid Docker warning
 ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/lib/x86_64-linux-gnu
-# Verify libraries are accessible
-RUN ldconfig -p | grep -E "(libgomp|libfaiss|libopenblas)" || echo "Warning: Some libraries not in ldconfig cache"
+# Verify libraries are accessible and in cache
+RUN ldconfig -p | grep -E "(libgomp|libfaiss|libopenblas)" && echo "✅ Libraries found in cache" || (echo "❌ Libraries not in cache" && ldconfig -p)
+# Verify native module can find its dependencies
+RUN ldd build/Release/faiss_node.node | grep -E "(libgomp|libfaiss|libopenblas)" && echo "✅ Native module dependencies resolved" || (echo "❌ Missing dependencies:" && ldd build/Release/faiss_node.node)
 RUN npm run test:ci
 
 # Production stage
