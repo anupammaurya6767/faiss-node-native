@@ -38,7 +38,8 @@
             "-L/usr/local/lib",
             "-L/opt/homebrew/Cellar/openblas/0.3.30/lib",
             "-lfaiss",
-            "-lopenblas"
+            "-lopenblas",
+            "-lomp"
           ],
           "ldflags": [
             "-L/opt/homebrew/lib",
