@@ -64,6 +64,7 @@ jobs:
           cmake -B build \
             -DFAISS_ENABLE_GPU=OFF \
             -DFAISS_ENABLE_PYTHON=OFF \
+            -DBUILD_TESTING=OFF \
             -DCMAKE_INSTALL_PREFIX=/usr/local
           cmake --build build -j$(nproc)
           sudo cmake --install build
