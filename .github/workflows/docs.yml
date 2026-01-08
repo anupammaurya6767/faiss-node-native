@@ -38,8 +38,8 @@ jobs:
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
-        with:
-          enablement: true
+        # Note: GitHub Pages must be manually enabled in repository settings first
+        # Go to: Settings → Pages → Source: "GitHub Actions"
       
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
