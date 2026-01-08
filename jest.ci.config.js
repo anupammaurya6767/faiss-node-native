@@ -17,7 +17,7 @@ module.exports = {
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
   verbose: true,
-  maxWorkers: 2,
+  maxWorkers: 1, // Use single worker to avoid OpenMP/threading conflicts
   testTimeout: 30000,
   // Fail fast in CI
   bail: false

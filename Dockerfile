@@ -53,6 +53,10 @@ FROM builder AS test
 # But .dockerignore was excluding them, so we explicitly copy them
 COPY test ./test
 COPY jest.config.js jest.ci.config.js ./
+# Set library path for runtime (critical for native module to find libgomp, libfaiss, etc.)
+ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
+# Verify libraries are accessible
+RUN ldconfig -p | grep -E "(libgomp|libfaiss|libopenblas)" || echo "Warning: Some libraries not in ldconfig cache"
 RUN npm run test:ci
 
 # Production stage
