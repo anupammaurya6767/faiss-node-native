@@ -73,9 +73,17 @@ jobs:
           cmake --build build -j$(nproc)
           sudo cmake --install build
           # Verify FAISS headers are installed (critical check)
+          echo "Checking FAISS installation..."
+          echo "Looking for headers in /usr/local/include/faiss/:"
+          ls -la /usr/local/include/faiss/ 2>&1 | head -20 || echo "Directory not found"
+          echo "Looking for headers in /usr/local/include/:"
+          find /usr/local/include -name "FaissAssert.h" 2>&1 || echo "Not found"
+          echo "Checking if faiss directory exists:"
+          test -d /usr/local/include/faiss && echo "✅ Directory exists" || echo "❌ Directory missing"
           if [ ! -f /usr/local/include/faiss/impl/FaissAssert.h ]; then
-            echo "ERROR: FAISS headers not found at /usr/local/include/faiss/"
-            ls -la /usr/local/include/faiss/ || echo "Directory doesn't exist"
+            echo "ERROR: FAISS headers not found at /usr/local/include/faiss/impl/FaissAssert.h"
+            echo "Searching for FaissAssert.h in entire system:"
+            find /usr -name "FaissAssert.h" 2>/dev/null | head -5 || echo "Not found anywhere"
             exit 1
           fi
           echo "✅ FAISS headers verified: /usr/local/include/faiss/impl/FaissAssert.h exists"
