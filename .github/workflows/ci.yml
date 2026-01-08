@@ -88,11 +88,24 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           # Double-check headers are accessible
+          echo "Checking FAISS headers..."
+          ls -la /usr/local/include/faiss/ | head -10
           test -f /usr/local/include/faiss/impl/FaissAssert.h || (echo "ERROR: Headers missing before build" && exit 1)
           echo "✅ Headers verified before native module build"
+          # Verify compiler can find them
+          echo "Testing compiler include path..."
+          echo '#include <faiss/impl/FaissAssert.h>' | g++ -E -x c++ - -I/usr/local/include 2>&1 | head -5 || echo "Compiler test failed"
       
       - name: Build native module
-        run: npm run build
+        run: |
+          # Debug for Linux: Show what node-gyp will see
+          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+            echo "Include paths in binding.gyp:"
+            cat binding.gyp | grep -A 5 "include_dirs"
+            echo "Testing if headers are accessible from build directory:"
+            test -f /usr/local/include/faiss/impl/FaissAssert.h && echo "✅ Header file exists" || echo "❌ Header file missing"
+          fi
+          npm run build
       
       - name: Run unit tests
         run: npm run test:ci
