@@ -42,7 +42,8 @@ RUN npm run build
 
 # Test stage
 FROM builder AS test
-# Copy test files (they should already be there, but ensure they are)
+# Test files should already be copied with COPY . . above
+# But .dockerignore was excluding them, so we explicitly copy them
 COPY test ./test
 COPY jest.config.js jest.ci.config.js ./
 RUN npm run test:ci
