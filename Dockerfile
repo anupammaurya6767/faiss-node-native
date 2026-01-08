@@ -54,7 +54,8 @@ FROM builder AS test
 COPY test ./test
 COPY jest.config.js jest.ci.config.js ./
 # Set library path for runtime (critical for native module to find libgomp, libfaiss, etc.)
-ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
+# Use explicit path without variable expansion to avoid Docker warning
+ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/lib/x86_64-linux-gnu
 # Verify libraries are accessible
 RUN ldconfig -p | grep -E "(libgomp|libfaiss|libopenblas)" || echo "Warning: Some libraries not in ldconfig cache"
 RUN npm run test:ci
@@ -82,7 +83,7 @@ COPY --from=builder /app/build/Release/faiss_node.node ./build/Release/
 # Install production dependencies only
 RUN npm ci --production --ignore-scripts
 
-# Set library path
-ENV LD_LIBRARY_PATH=/usr/local/lib:${LD_LIBRARY_PATH}
+# Set library path (use explicit path to avoid undefined variable warning)
+ENV LD_LIBRARY_PATH=/usr/local/lib
 
 CMD ["node"]
