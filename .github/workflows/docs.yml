@@ -36,10 +36,10 @@ jobs:
       - name: Generate documentation
         run: npm run docs
       
-      - name: Setup Pages
+      - name: Setup Pages (clear any custom domain)
         uses: actions/configure-pages@v4
-        # Note: GitHub Pages must be manually enabled in repository settings first
-        # Go to: Settings → Pages → Source: "GitHub Actions"
+        # This will use default GitHub Pages domain (username.github.io/repo)
+        # If custom domain is set in repo settings, it needs to be manually cleared
       
       - name: Remove CNAME and ensure clean deployment
         run: |
