@@ -41,6 +41,7 @@ export OpenMP_gomp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib
 cmake -B build \
   -DFAISS_ENABLE_GPU=OFF \
   -DFAISS_ENABLE_PYTHON=OFF \
+  -DBUILD_TESTING=OFF \
   -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -lomp" \
   -DOpenMP_CXX_LIB_NAMES="omp" \
   -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
