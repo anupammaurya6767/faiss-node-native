@@ -176,9 +176,8 @@ jobs:
           fi
           
           # Add rpath to native module so it can find libraries (SIP-safe)
-          install_name_tool -add_rpath "$LIBOMP_PATH" build/Release/faiss_node.node
-          install_name_tool -add_rpath "$OPENBLAS_PATH" build/Release/faiss_node.node
-          install_name_tool -add_rpath "$FAISS_PATH" build/Release/faiss_node.node
+          # Since all libraries are now in /usr/local/lib, we only need one rpath
+          install_name_tool -add_rpath "/usr/local/lib" build/Release/faiss_node.node
           install_name_tool -add_rpath "@loader_path" build/Release/faiss_node.node
           
           echo "✅ Added rpaths to native module"
