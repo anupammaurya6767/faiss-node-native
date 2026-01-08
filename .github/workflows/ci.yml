@@ -276,8 +276,12 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           echo "=== Running tests with single worker (OpenMP threading safety) ==="
+          # Limit OpenMP threads to 1 to avoid threading conflicts
+          export OMP_NUM_THREADS=1
           # Force single worker to avoid OpenMP threading conflicts
           npm run test:ci -- --maxWorkers=1
+        env:
+          OMP_NUM_THREADS: 1
       
       - name: Run unit tests (non-macOS)
         if: matrix.os != 'macos-latest'
