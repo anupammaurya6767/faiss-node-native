@@ -31,25 +31,26 @@ jobs:
         run: |
           brew install cmake libomp openblas
           # FAISS needs to be built from source on macOS GitHub Actions
+          LIBOMP_PREFIX=$(brew --prefix libomp)
           git clone https://github.com/facebookresearch/faiss.git /tmp/faiss
           cd /tmp/faiss
-          # Set OpenMP paths for CMake (both C and CXX)
-          export OpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -lomp"
+          # Set OpenMP paths for CMake (both C and CXX) - include path is critical for omp.h
+          export OpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -Wno-unused-command-line-argument -I${LIBOMP_PREFIX}/include"
           export OpenMP_CXX_LIB_NAMES="omp"
-          export OpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib
-          export OpenMP_C_FLAGS="-Xpreprocessor -fopenmp -lomp"
+          export OpenMP_omp_LIBRARY="${LIBOMP_PREFIX}/lib/libomp.dylib"
+          export OpenMP_C_FLAGS="-Xpreprocessor -fopenmp -Wno-unused-command-line-argument -I${LIBOMP_PREFIX}/include"
           export OpenMP_C_LIB_NAMES="omp"
-          export OpenMP_gomp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib
+          export OpenMP_gomp_LIBRARY="${LIBOMP_PREFIX}/lib/libomp.dylib"
           cmake -B build \
             -DFAISS_ENABLE_GPU=OFF \
             -DFAISS_ENABLE_PYTHON=OFF \
             -DBUILD_TESTING=OFF \
-            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -lomp" \
+            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -Wno-unused-command-line-argument -I${LIBOMP_PREFIX}/include" \
             -DOpenMP_CXX_LIB_NAMES="omp" \
-            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
-            -DOpenMP_C_FLAGS="-Xpreprocessor -fopenmp -lomp" \
+            -DOpenMP_omp_LIBRARY="${LIBOMP_PREFIX}/lib/libomp.dylib" \
+            -DOpenMP_C_FLAGS="-Xpreprocessor -fopenmp -Wno-unused-command-line-argument -I${LIBOMP_PREFIX}/include" \
             -DOpenMP_C_LIB_NAMES="omp" \
-            -DOpenMP_gomp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib
+            -DOpenMP_gomp_LIBRARY="${LIBOMP_PREFIX}/lib/libomp.dylib"
           cmake --build build -j$(sysctl -n hw.ncpu)
           sudo cmake --install build
           cd -
