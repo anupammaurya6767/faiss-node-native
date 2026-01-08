@@ -10,8 +10,10 @@
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",
+        "src/cpp",
         "/opt/homebrew/include",
-        "/usr/local/include"
+        "/usr/local/include",
+        "/usr/include"
       ],
       "defines": [
         "NAPI_VERSION=8"
@@ -38,6 +40,18 @@
           "ldflags": [
             "-L/opt/homebrew/lib",
             "-L/opt/homebrew/Cellar/openblas/0.3.30/lib"
+          ]
+        }],
+        ["OS=='linux'", {
+          "libraries": [
+            "-L/usr/local/lib",
+            "-L/usr/lib",
+            "-lfaiss",
+            "-lopenblas"
+          ],
+          "ldflags": [
+            "-L/usr/local/lib",
+            "-L/usr/lib"
           ]
         }]
       ],
