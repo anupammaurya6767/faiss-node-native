@@ -41,16 +41,15 @@ jobs:
           export OpenMP_C_FLAGS="-Xpreprocessor -fopenmp -Wno-unused-command-line-argument -I${LIBOMP_PREFIX}/include"
           export OpenMP_C_LIB_NAMES="omp"
           export OpenMP_gomp_LIBRARY="${LIBOMP_PREFIX}/lib/libomp.dylib"
+          # Try building FAISS without OpenMP to avoid threading issues
+          # This is a workaround for SIGSEGV crashes in CI
           cmake -B build \
             -DFAISS_ENABLE_GPU=OFF \
             -DFAISS_ENABLE_PYTHON=OFF \
             -DBUILD_TESTING=OFF \
-            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -Wno-unused-command-line-argument -I${LIBOMP_PREFIX}/include" \
-            -DOpenMP_CXX_LIB_NAMES="omp" \
-            -DOpenMP_omp_LIBRARY="${LIBOMP_PREFIX}/lib/libomp.dylib" \
-            -DOpenMP_C_FLAGS="-Xpreprocessor -fopenmp -Wno-unused-command-line-argument -I${LIBOMP_PREFIX}/include" \
-            -DOpenMP_C_LIB_NAMES="omp" \
-            -DOpenMP_gomp_LIBRARY="${LIBOMP_PREFIX}/lib/libomp.dylib"
+            -DFAISS_OPT_LEVEL=generic \
+            -DCMAKE_CXX_FLAGS="-DFAISS_DISABLE_OPENMP" \
+            -DCMAKE_C_FLAGS="-DFAISS_DISABLE_OPENMP"
           cmake --build build -j$(sysctl -n hw.ncpu)
           sudo cmake --install build
           # Verify what was installed
