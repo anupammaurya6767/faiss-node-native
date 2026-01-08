@@ -82,6 +82,55 @@ jobs:
         if: matrix.os != 'macos-latest'
         run: npm run build
       
+      - name: Copy libraries to /usr/local/lib (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "=== Copying libraries to /usr/local/lib ==="
+          LIBOMP_PATH=$(brew --prefix libomp)/lib
+          OPENBLAS_PATH=$(brew --prefix openblas)/lib
+          
+          echo "Source paths:"
+          echo "  libomp: $LIBOMP_PATH"
+          echo "  openblas: $OPENBLAS_PATH"
+          
+          # Check if libomp exists in Homebrew location
+          if [ -f "$LIBOMP_PATH/libomp.dylib" ]; then
+            if [ ! -f "/usr/local/lib/libomp.dylib" ]; then
+              echo "Copying libomp.dylib from $LIBOMP_PATH to /usr/local/lib"
+              sudo cp "$LIBOMP_PATH/libomp.dylib" /usr/local/lib/ || (echo "❌ Failed to copy libomp" && exit 1)
+              # Verify copy succeeded
+              test -f "/usr/local/lib/libomp.dylib" && echo "✅ libomp.dylib copied successfully" || (echo "❌ libomp.dylib copy failed" && exit 1)
+            else
+              echo "✅ libomp.dylib already exists in /usr/local/lib"
+            fi
+          else
+            echo "❌ libomp.dylib not found in $LIBOMP_PATH"
+            ls -la "$LIBOMP_PATH" || echo "Directory doesn't exist"
+            exit 1
+          fi
+          
+          # Check if openblas exists in Homebrew location
+          OPENBLAS_FILE=$(test -f "$OPENBLAS_PATH/libopenblas.dylib" && echo "$OPENBLAS_PATH/libopenblas.dylib" || echo "$OPENBLAS_PATH/libopenblas.0.dylib")
+          if [ -f "$OPENBLAS_FILE" ]; then
+            OPENBLAS_BASENAME=$(basename "$OPENBLAS_FILE")
+            if [ ! -f "/usr/local/lib/$OPENBLAS_BASENAME" ]; then
+              echo "Copying $OPENBLAS_BASENAME from $OPENBLAS_PATH to /usr/local/lib"
+              sudo cp "$OPENBLAS_FILE" /usr/local/lib/ || (echo "❌ Failed to copy openblas" && exit 1)
+              # Verify copy succeeded
+              test -f "/usr/local/lib/$OPENBLAS_BASENAME" && echo "✅ $OPENBLAS_BASENAME copied successfully" || (echo "❌ $OPENBLAS_BASENAME copy failed" && exit 1)
+            else
+              echo "✅ $OPENBLAS_BASENAME already exists in /usr/local/lib"
+            fi
+          else
+            echo "❌ openblas not found in $OPENBLAS_PATH"
+            ls -la "$OPENBLAS_PATH" || echo "Directory doesn't exist"
+            exit 1
+          fi
+          
+          echo ""
+          echo "=== Verifying all libraries are in /usr/local/lib ==="
+          ls -la /usr/local/lib/libfaiss* /usr/local/lib/libomp* /usr/local/lib/libopenblas* 2>&1
+      
       - name: Fix library paths in binary (macOS - SIP workaround)
         if: matrix.os == 'macos-latest'
         run: |
@@ -95,9 +144,9 @@ jobs:
           echo "  openblas: $OPENBLAS_PATH"
           echo "  faiss: $FAISS_PATH"
           
-          # Verify libraries exist
-          test -f "$LIBOMP_PATH/libomp.dylib" && echo "✅ libomp.dylib exists" || echo "❌ libomp.dylib missing"
-          test -f "$OPENBLAS_PATH/libopenblas.dylib" || test -f "$OPENBLAS_PATH/libopenblas.0.dylib" && echo "✅ libopenblas exists" || echo "❌ libopenblas missing"
+          # Verify libraries exist (now they should be in /usr/local/lib)
+          test -f "/usr/local/lib/libomp.dylib" && echo "✅ libomp.dylib exists" || echo "❌ libomp.dylib missing"
+          test -f "/usr/local/lib/libopenblas.dylib" || test -f "/usr/local/lib/libopenblas.0.dylib" && echo "✅ libopenblas exists" || echo "❌ libopenblas missing"
           
           # CRITICAL: Fix libfaiss.dylib's install name and dependencies
           # libfaiss.dylib itself depends on libomp, and if it can't find it, it crashes
