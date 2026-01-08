@@ -61,28 +61,26 @@ jobs:
       - name: Build native module
         run: npm run build
       
+      - name: Set up library paths (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          LIBOMP_PATH=$(brew --prefix libomp)/lib
+          OPENBLAS_PATH=$(brew --prefix openblas)/lib
+          echo "LIBOMP_PATH=$LIBOMP_PATH" >> $GITHUB_ENV
+          echo "OPENBLAS_PATH=$OPENBLAS_PATH" >> $GITHUB_ENV
+          echo "DYLD_LIBRARY_PATH=$LIBOMP_PATH:$OPENBLAS_PATH" >> $GITHUB_ENV
+          echo "✅ Set DYLD_LIBRARY_PATH=$LIBOMP_PATH:$OPENBLAS_PATH"
+      
       - name: Verify native module dependencies (macOS)
         if: matrix.os == 'macos-latest'
         run: |
           echo "=== Checking native module dependencies ==="
           otool -L build/Release/faiss_node.node || echo "otool failed"
           echo ""
-          echo "=== Checking for libomp ==="
-          LIBOMP_PATH=$(brew --prefix libomp)/lib/libomp.dylib
-          if [ -f "$LIBOMP_PATH" ]; then
-            echo "✅ libomp found at: $LIBOMP_PATH"
-          else
-            echo "❌ libomp not found"
-          fi
-          echo ""
-          echo "=== Testing module load with DYLD_LIBRARY_PATH ==="
-          export DYLD_LIBRARY_PATH=$(brew --prefix libomp)/lib:$(brew --prefix openblas)/lib:$DYLD_LIBRARY_PATH
+          echo "=== Testing module load ==="
           node -e "try { const mod = require('./build/Release/faiss_node.node'); console.log('✅ Native module loaded successfully'); } catch(e) { console.error('❌ Failed to load:', e.message); console.error(e.stack); process.exit(1); }" || exit 1
       
       - name: Run unit tests
-        if: matrix.os == 'macos-latest'
-        env:
-          DYLD_LIBRARY_PATH: ${{ env.DYLD_LIBRARY_PATH || '' }}:$(brew --prefix libomp)/lib:$(brew --prefix openblas)/lib
         run: npm run test:ci
       
       - name: Run integration tests
