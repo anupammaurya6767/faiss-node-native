@@ -1,4 +1,6 @@
-# Contributing to FAISS-Node
+# Contributing to @faiss-node/native
+
+Thank you for your interest in contributing to @faiss-node/native! I'm Anupam Maurya, the maintainer of this project, and I welcome contributions from the community.
 
 Thanks for checking out the project! I'd love to have your contributions.
 
