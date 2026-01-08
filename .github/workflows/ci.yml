@@ -60,6 +60,10 @@ jobs:
       
       - name: Build native module
         run: npm run build
+        env:
+          # Ensure node-gyp finds the FAISS we just built
+          LDFLAGS: "-L/usr/local/lib"
+          CPPFLAGS: "-I/usr/local/include"
       
       - name: Fix library paths in binary (macOS - SIP workaround)
         if: matrix.os == 'macos-latest'
