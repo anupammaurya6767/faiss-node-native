@@ -36,6 +36,8 @@
           "libraries": [
             "-L/opt/homebrew/lib",
             "-L/usr/local/lib",
+            "-L/opt/homebrew/opt/libomp/lib",
+            "-L/usr/local/opt/libomp/lib",
             "-L/opt/homebrew/Cellar/openblas/0.3.30/lib",
             "-lfaiss",
             "-lopenblas",
@@ -43,6 +45,9 @@
           ],
           "ldflags": [
             "-L/opt/homebrew/lib",
+            "-L/usr/local/lib",
+            "-L/opt/homebrew/opt/libomp/lib",
+            "-L/usr/local/opt/libomp/lib",
             "-L/opt/homebrew/Cellar/openblas/0.3.30/lib",
             "-headerpad_max_install_names"
           ]
