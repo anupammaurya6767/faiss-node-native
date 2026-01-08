@@ -4,6 +4,8 @@ High-performance Node.js native bindings for Facebook FAISS - the industry-stand
 
 I created this package because I needed a fast, reliable, and well-tested FAISS binding for Node.js. After working with various vector search solutions, I decided to build something that combines the power of FAISS with a clean, modern JavaScript API.
 
+> **Note**: This is the first release (v0.1.0) - ready for production use with comprehensive test coverage (1000+ tests) and full documentation.
+
 ## Current Status: Phase 2 Complete ✅
 
 Right now, the project supports:
