@@ -107,6 +107,7 @@ jobs:
             install_name_tool -id "@rpath/libfaiss.dylib" "$FAISS_PATH/libfaiss.dylib"
             
             # Find the current libomp path in libfaiss and fix it to use @rpath
+            # Since we're copying to /usr/local/lib, use @rpath/libomp.dylib
             LIBOMP_OLD=$(otool -L "$FAISS_PATH/libfaiss.dylib" | grep libomp | awk '{print $1}' | head -1)
             if [ -n "$LIBOMP_OLD" ] && [ "$LIBOMP_OLD" != "@rpath/libomp.dylib" ]; then
               echo "Fixing libfaiss libomp path: $LIBOMP_OLD -> @rpath/libomp.dylib"
@@ -114,9 +115,10 @@ jobs:
               echo "✅ Fixed libfaiss libomp dependency"
             fi
             
-            # Also fix openblas to use @rpath
+            # Also fix openblas to use @rpath (will be in /usr/local/lib)
             OPENBLAS_OLD=$(otool -L "$FAISS_PATH/libfaiss.dylib" | grep openblas | awk '{print $1}' | head -1)
             if [ -n "$OPENBLAS_OLD" ]; then
+              # Determine which openblas file we'll have in /usr/local/lib
               OPENBLAS_NEW=$(test -f "$OPENBLAS_PATH/libopenblas.dylib" && echo "@rpath/libopenblas.dylib" || echo "@rpath/libopenblas.0.dylib")
               if [ "$OPENBLAS_OLD" != "$OPENBLAS_NEW" ] && [ "$OPENBLAS_OLD" != "@rpath/libopenblas.dylib" ] && [ "$OPENBLAS_OLD" != "@rpath/libopenblas.0.dylib" ]; then
                 echo "Fixing libfaiss openblas path: $OPENBLAS_OLD -> $OPENBLAS_NEW"
@@ -126,9 +128,9 @@ jobs:
             fi
             
             # Add rpaths to libfaiss.dylib so it can find its dependencies
+            # Since we're copying libraries to /usr/local/lib, we only need one rpath
             echo "Adding rpaths to libfaiss.dylib"
-            install_name_tool -add_rpath "$LIBOMP_PATH" "$FAISS_PATH/libfaiss.dylib"
-            install_name_tool -add_rpath "$OPENBLAS_PATH" "$FAISS_PATH/libfaiss.dylib"
+            install_name_tool -add_rpath "/usr/local/lib" "$FAISS_PATH/libfaiss.dylib"
             install_name_tool -add_rpath "@loader_path" "$FAISS_PATH/libfaiss.dylib"
             
             echo "=== Checking libfaiss AFTER fixes ==="
@@ -189,7 +191,15 @@ jobs:
       - name: Verify native module load (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          echo "=== Testing module load ==="
+          echo "=== Testing module load with library tracing ==="
+          # Use DYLD_PRINT_LIBRARIES to see what libraries are being loaded
+          export DYLD_PRINT_LIBRARIES=1
+          export DYLD_PRINT_LIBRARIES_POST_LAUNCH=1
+          node -e "try { const mod = require('./build/Release/faiss_node.node'); console.log('✅ Native module loaded successfully'); } catch(e) { console.error('❌ Failed to load:', e.message); console.error(e.stack); process.exit(1); }" 2>&1 | grep -E "(dyld|library|error|missing)" | head -30 || echo "No library errors found in output"
+          echo ""
+          echo "=== Testing without tracing ==="
+          unset DYLD_PRINT_LIBRARIES
+          unset DYLD_PRINT_LIBRARIES_POST_LAUNCH
           node -e "try { const mod = require('./build/Release/faiss_node.node'); console.log('✅ Native module loaded successfully'); } catch(e) { console.error('❌ Failed to load:', e.message); console.error(e.stack); process.exit(1); }" || exit 1
       
       - name: Run unit tests
