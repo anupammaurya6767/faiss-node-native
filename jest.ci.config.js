@@ -17,7 +17,8 @@ module.exports = {
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
   verbose: true,
-  maxWorkers: 1, // Use single worker to avoid OpenMP/threading conflicts
+  // Note: maxWorkers is overridden by --runInBand in CI
+  // runInBand runs tests serially in current process (strictest mode)
   testTimeout: 30000,
   // Fail fast in CI
   bail: false,

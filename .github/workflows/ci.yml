@@ -279,17 +279,13 @@ jobs:
       - name: Run unit tests
         if: matrix.os == 'macos-latest'
         run: |
-          echo "=== Running tests with single worker (OpenMP threading safety) ==="
+          echo "=== Running tests with runInBand (OpenMP threading safety) ==="
           # Limit OpenMP threads to 1 to avoid threading conflicts
           export OMP_NUM_THREADS=1
           export OMP_THREAD_LIMIT=1
-          # Try running a single test file first to isolate the issue
-          echo "=== Testing with single test file first ==="
-          npm run test:ci -- --maxWorkers=1 --testPathPattern="index.test.js" || echo "Single test file failed, continuing..."
-          echo ""
-          echo "=== Running all tests ==="
-          # Force single worker to avoid OpenMP threading conflicts
-          npm run test:ci -- --maxWorkers=1 --runInBand
+          # Use --runInBand to run tests serially in current process (no workers)
+          # This is the strictest mode and avoids all worker/threading issues
+          npm run test:ci -- --runInBand
         env:
           OMP_NUM_THREADS: 1
           OMP_THREAD_LIMIT: 1
