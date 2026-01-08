@@ -41,6 +41,13 @@ jobs:
         # Note: GitHub Pages must be manually enabled in repository settings first
         # Go to: Settings → Pages → Source: "GitHub Actions"
       
+      - name: Remove CNAME if exists (prevent custom domain redirect)
+        run: |
+          if [ -f docs/html/CNAME ]; then
+            echo "Removing CNAME file to prevent custom domain redirect"
+            rm docs/html/CNAME
+          fi
+      
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
