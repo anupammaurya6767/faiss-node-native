@@ -59,11 +59,24 @@ jobs:
         run: npm ci
       
       - name: Build native module
-        run: npm run build
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "=== Building native module ==="
+          echo "LDFLAGS: $LDFLAGS"
+          echo "CPPFLAGS: $CPPFLAGS"
+          echo "Checking for FAISS library..."
+          ls -la /usr/local/lib/libfaiss* || echo "⚠️ No libfaiss found"
+          npm run build
+          echo "=== Checking what faiss_node.node linked against ==="
+          otool -L build/Release/faiss_node.node | head -10
         env:
           # Ensure node-gyp finds the FAISS we just built
           LDFLAGS: "-L/usr/local/lib"
           CPPFLAGS: "-I/usr/local/include"
+      
+      - name: Build native module (non-macOS)
+        if: matrix.os != 'macos-latest'
+        run: npm run build
       
       - name: Fix library paths in binary (macOS - SIP workaround)
         if: matrix.os == 'macos-latest'
@@ -110,24 +123,36 @@ jobs:
           fi
           
           echo "=== Checking faiss_node.node dependencies BEFORE fix ==="
-          otool -L build/Release/faiss_node.node | head -10
+          otool -L build/Release/faiss_node.node | head -15
           
           # CRITICAL: Fix faiss_node.node's direct dependencies
           # Change hardcoded paths to use @rpath so they're resolved via rpaths
           FAISS_OLD=$(otool -L build/Release/faiss_node.node | grep libfaiss | awk '{print $1}' | head -1)
-          if [ -n "$FAISS_OLD" ] && [ "$FAISS_OLD" != "@rpath/libfaiss.dylib" ]; then
+          echo "Current libfaiss path in faiss_node.node: $FAISS_OLD"
+          
+          if [ -n "$FAISS_OLD" ] && [ "$FAISS_OLD" != "@rpath/libfaiss.dylib" ] && [ "$FAISS_OLD" != "/usr/local/lib/libfaiss.dylib" ]; then
             echo "Fixing faiss_node.node libfaiss path: $FAISS_OLD -> @rpath/libfaiss.dylib"
             install_name_tool -change "$FAISS_OLD" "@rpath/libfaiss.dylib" build/Release/faiss_node.node
             echo "✅ Fixed faiss_node.node libfaiss dependency"
+          elif [ "$FAISS_OLD" == "/usr/local/lib/libfaiss.dylib" ]; then
+            echo "libfaiss path is already /usr/local/lib/libfaiss.dylib, changing to @rpath"
+            install_name_tool -change "/usr/local/lib/libfaiss.dylib" "@rpath/libfaiss.dylib" build/Release/faiss_node.node
+            echo "✅ Changed /usr/local/lib/libfaiss.dylib to @rpath/libfaiss.dylib"
+          else
+            echo "⚠️ libfaiss path is already @rpath or not found"
           fi
           
           OPENBLAS_OLD_NODE=$(otool -L build/Release/faiss_node.node | grep openblas | awk '{print $1}' | head -1)
+          echo "Current openblas path in faiss_node.node: $OPENBLAS_OLD_NODE"
+          
           if [ -n "$OPENBLAS_OLD_NODE" ]; then
             OPENBLAS_NEW_NODE=$(test -f "$OPENBLAS_PATH/libopenblas.dylib" && echo "@rpath/libopenblas.dylib" || echo "@rpath/libopenblas.0.dylib")
-            if [ "$OPENBLAS_OLD_NODE" != "$OPENBLAS_NEW_NODE" ]; then
+            if [ "$OPENBLAS_OLD_NODE" != "$OPENBLAS_NEW_NODE" ] && [ "$OPENBLAS_OLD_NODE" != "@rpath/libopenblas.dylib" ] && [ "$OPENBLAS_OLD_NODE" != "@rpath/libopenblas.0.dylib" ]; then
               echo "Fixing faiss_node.node openblas path: $OPENBLAS_OLD_NODE -> $OPENBLAS_NEW_NODE"
               install_name_tool -change "$OPENBLAS_OLD_NODE" "$OPENBLAS_NEW_NODE" build/Release/faiss_node.node
               echo "✅ Fixed faiss_node.node openblas dependency"
+            else
+              echo "⚠️ openblas path is already @rpath or correct"
             fi
           fi
           
