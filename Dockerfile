@@ -15,8 +15,6 @@ RUN apt-get update && apt-get install -y \
 # Build FAISS from source
 RUN git clone https://github.com/facebookresearch/faiss.git /tmp/faiss && \
     cd /tmp/faiss && \
-    # Remove perf_tests directory to avoid gflags dependency
-    rm -rf perf_tests && \
     cmake -B build \
         -DFAISS_ENABLE_GPU=OFF \
         -DFAISS_ENABLE_PYTHON=OFF \

@@ -26,8 +26,6 @@ jobs:
           # FAISS needs to be built from source on macOS GitHub Actions
           git clone https://github.com/facebookresearch/faiss.git /tmp/faiss
           cd /tmp/faiss
-          # Remove perf_tests directory to avoid gflags dependency
-          rm -rf perf_tests
           # Set OpenMP paths for CMake (both C and CXX)
           export OpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -lomp"
           export OpenMP_CXX_LIB_NAMES="omp"
@@ -88,8 +86,6 @@ jobs:
           # FAISS needs to be built from source on macOS GitHub Actions
           git clone https://github.com/facebookresearch/faiss.git /tmp/faiss
           cd /tmp/faiss
-          # Remove perf_tests directory to avoid gflags dependency
-          rm -rf perf_tests
           # Set OpenMP paths for CMake (both C and CXX)
           export OpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -lomp"
           export OpenMP_CXX_LIB_NAMES="omp"
@@ -151,8 +147,6 @@ jobs:
           # Build FAISS from source
           git clone https://github.com/facebookresearch/faiss.git /tmp/faiss
           cd /tmp/faiss
-          # Remove perf_tests directory to avoid gflags dependency
-          rm -rf perf_tests
           cmake -B build \
             -DFAISS_ENABLE_GPU=OFF \
             -DFAISS_ENABLE_PYTHON=OFF \
