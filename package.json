@@ -13,6 +13,8 @@
     "test:integration": "jest test/integration",
     "test:watch": "jest --watch",
     "test:memory": "node --expose-gc test/memory.test.js",
+    "test:local": "npm run clean && npm run build && npm test",
+    "ci:status": "bash scripts/check-ci-status.sh",
     "docs": "doxygen Doxyfile",
     "docs:serve": "cd docs/html && python3 -m http.server 8000",
     "publish:local": "bash -c 'export NODE_AUTH_TOKEN=$(grep NPM_TOKEN .env | cut -d \\\"=\\\" -f2) && npm config set //registry.npmjs.org/:_authToken $NODE_AUTH_TOKEN && npm publish --access public'",
