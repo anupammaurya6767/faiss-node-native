@@ -53,6 +53,10 @@ jobs:
             -DOpenMP_gomp_LIBRARY="${LIBOMP_PREFIX}/lib/libomp.dylib"
           cmake --build build -j$(sysctl -n hw.ncpu)
           sudo cmake --install build
+          # Verify what was installed
+          echo "=== Checking what FAISS installed ==="
+          ls -la /usr/local/lib/libfaiss* || echo "No libfaiss found"
+          ls -la /usr/local/include/faiss/ | head -5 || echo "No FAISS headers found"
           cd -
       
       - name: Install npm dependencies
@@ -97,6 +101,7 @@ jobs:
           
           # CRITICAL: Fix libfaiss.dylib's install name and dependencies
           # libfaiss.dylib itself depends on libomp, and if it can't find it, it crashes
+          # NOTE: FAISS might be built as static library (.a) instead of dynamic (.dylib)
           if [ -f "$FAISS_PATH/libfaiss.dylib" ]; then
             echo "✅ libfaiss.dylib exists (dynamic)"
             echo "=== Checking libfaiss BEFORE fixes ==="
