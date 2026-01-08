@@ -6,8 +6,8 @@ Thank you for your interest in contributing to @faiss-node/native! I'm Anupam Ma
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd faiss-node
+   git clone https://github.com/anupammaurya6767/faiss-node-native.git
+   cd faiss-node-native
    ```
 
 2. **Install dependencies**
