@@ -26,7 +26,16 @@ jobs:
           # FAISS needs to be built from source on macOS GitHub Actions
           git clone https://github.com/facebookresearch/faiss.git /tmp/faiss
           cd /tmp/faiss
-          cmake -B build -DFAISS_ENABLE_GPU=OFF -DFAISS_ENABLE_PYTHON=OFF .
+          # Set OpenMP paths for CMake
+          export OpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -lomp"
+          export OpenMP_CXX_LIB_NAMES="omp"
+          export OpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib
+          cmake -B build \
+            -DFAISS_ENABLE_GPU=OFF \
+            -DFAISS_ENABLE_PYTHON=OFF \
+            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -lomp" \
+            -DOpenMP_CXX_LIB_NAMES="omp" \
+            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib
           cmake --build build -j$(sysctl -n hw.ncpu)
           sudo cmake --install build
           cd -
@@ -70,7 +79,16 @@ jobs:
           # FAISS needs to be built from source on macOS GitHub Actions
           git clone https://github.com/facebookresearch/faiss.git /tmp/faiss
           cd /tmp/faiss
-          cmake -B build -DFAISS_ENABLE_GPU=OFF -DFAISS_ENABLE_PYTHON=OFF .
+          # Set OpenMP paths for CMake
+          export OpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -lomp"
+          export OpenMP_CXX_LIB_NAMES="omp"
+          export OpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib
+          cmake -B build \
+            -DFAISS_ENABLE_GPU=OFF \
+            -DFAISS_ENABLE_PYTHON=OFF \
+            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -lomp" \
+            -DOpenMP_CXX_LIB_NAMES="omp" \
+            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib
           cmake --build build -j$(sysctl -n hw.ncpu)
           sudo cmake --install build
           cd -
