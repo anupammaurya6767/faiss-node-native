@@ -226,9 +226,10 @@ jobs:
             install_name_tool -change "/usr/local/lib/libfaiss.dylib" "@rpath/libfaiss.dylib" build/Release/faiss_node.node
             echo "✅ Changed /usr/local/lib/libfaiss.dylib to @rpath/libfaiss.dylib"
           else
-            echo "⚠️ libfaiss path is already @rpath or not found"
+            echo "⚠️ libfaiss path is already @rpath or not found (static library)"
           fi
           
+          # Fix openblas path
           OPENBLAS_OLD_NODE=$(otool -L build/Release/faiss_node.node | grep openblas | awk '{print $1}' | head -1)
           echo "Current openblas path in faiss_node.node: $OPENBLAS_OLD_NODE"
           
@@ -242,6 +243,18 @@ jobs:
             else
               echo "⚠️ openblas path is already @rpath/libopenblas.dylib"
             fi
+          fi
+          
+          # Fix libomp path if present (FAISS may require it)
+          LIBOMP_OLD_NODE=$(otool -L build/Release/faiss_node.node | grep libomp | awk '{print $1}' | head -1)
+          echo "Current libomp path in faiss_node.node: $LIBOMP_OLD_NODE"
+          
+          if [ -n "$LIBOMP_OLD_NODE" ] && [ "$LIBOMP_OLD_NODE" != "@rpath/libomp.dylib" ]; then
+            echo "Fixing faiss_node.node libomp path: $LIBOMP_OLD_NODE -> @rpath/libomp.dylib"
+            install_name_tool -change "$LIBOMP_OLD_NODE" "@rpath/libomp.dylib" build/Release/faiss_node.node
+            echo "✅ Fixed faiss_node.node libomp dependency"
+          else
+            echo "⚠️ libomp path is already @rpath or not found"
           fi
           
           # Add rpath to native module so it can find libraries (SIP-safe)
