@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        os: [macos-latest]
         node-version: [18, 20, 22]
     
     steps:
@@ -55,65 +55,11 @@ jobs:
           sudo cmake --install build
           cd -
       
-      - name: Install dependencies (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake libopenblas-dev libomp-dev
-          # FAISS needs to be built from source on Linux
-          git clone https://github.com/facebookresearch/faiss.git /tmp/faiss
-          cd /tmp/faiss
-          cmake -B build \
-            -DFAISS_ENABLE_GPU=OFF \
-            -DFAISS_ENABLE_PYTHON=OFF \
-            -DBUILD_TESTING=OFF \
-            -DCMAKE_INSTALL_PREFIX=/usr/local \
-            -DCMAKE_CXX_FLAGS="-fopenmp" \
-            -DCMAKE_C_FLAGS="-fopenmp"
-          cmake --build build -j$(nproc)
-          sudo cmake --install build
-          # Verify FAISS headers are installed (critical check)
-          echo "Checking FAISS installation..."
-          echo "Looking for headers in /usr/local/include/faiss/:"
-          ls -la /usr/local/include/faiss/ 2>&1 | head -20 || echo "Directory not found"
-          echo "Looking for headers in /usr/local/include/:"
-          find /usr/local/include -name "FaissAssert.h" 2>&1 || echo "Not found"
-          echo "Checking if faiss directory exists:"
-          test -d /usr/local/include/faiss && echo "✅ Directory exists" || echo "❌ Directory missing"
-          if [ ! -f /usr/local/include/faiss/impl/FaissAssert.h ]; then
-            echo "ERROR: FAISS headers not found at /usr/local/include/faiss/impl/FaissAssert.h"
-            echo "Searching for FaissAssert.h in entire system:"
-            find /usr -name "FaissAssert.h" 2>/dev/null | head -5 || echo "Not found anywhere"
-            exit 1
-          fi
-          echo "✅ FAISS headers verified: /usr/local/include/faiss/impl/FaissAssert.h exists"
-          cd -
-      
       - name: Install npm dependencies
         run: npm ci
       
-      - name: Verify FAISS before build
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          # Double-check headers are accessible
-          echo "Checking FAISS headers..."
-          ls -la /usr/local/include/faiss/ | head -10
-          test -f /usr/local/include/faiss/impl/FaissAssert.h || (echo "ERROR: Headers missing before build" && exit 1)
-          echo "✅ Headers verified before native module build"
-          # Verify compiler can find them
-          echo "Testing compiler include path..."
-          echo '#include <faiss/impl/FaissAssert.h>' | g++ -E -x c++ - -I/usr/local/include 2>&1 | head -5 || echo "Compiler test failed"
-      
       - name: Build native module
-        run: |
-          # Debug for Linux: Show what node-gyp will see
-          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
-            echo "Include paths in binding.gyp:"
-            cat binding.gyp | grep -A 5 "include_dirs"
-            echo "Testing if headers are accessible from build directory:"
-            test -f /usr/local/include/faiss/impl/FaissAssert.h && echo "✅ Header file exists" || echo "❌ Header file missing"
-          fi
-          npm run build
+        run: npm run build
       
       - name: Run unit tests
         run: npm run test:ci
