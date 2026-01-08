@@ -20,5 +20,12 @@ module.exports = {
   maxWorkers: 1, // Use single worker to avoid OpenMP/threading conflicts
   testTimeout: 30000,
   // Fail fast in CI
-  bail: false
+  bail: false,
+  // Show which tests are running/failing
+  displayName: {
+    name: 'FAISS-Node',
+    color: 'blue'
+  },
+  // Report individual test failures
+  reporters: ['default']
 };
