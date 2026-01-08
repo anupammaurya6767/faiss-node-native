@@ -105,6 +105,28 @@ jobs:
             echo "⚠️ libfaiss.dylib not found (may be static library)"
           fi
           
+          echo "=== Checking faiss_node.node dependencies BEFORE fix ==="
+          otool -L build/Release/faiss_node.node | head -10
+          
+          # CRITICAL: Fix faiss_node.node's direct dependencies
+          # Change hardcoded paths to use @rpath so they're resolved via rpaths
+          FAISS_OLD=$(otool -L build/Release/faiss_node.node | grep libfaiss | awk '{print $1}' | head -1)
+          if [ -n "$FAISS_OLD" ] && [ "$FAISS_OLD" != "@rpath/libfaiss.dylib" ]; then
+            echo "Fixing faiss_node.node libfaiss path: $FAISS_OLD -> @rpath/libfaiss.dylib"
+            install_name_tool -change "$FAISS_OLD" "@rpath/libfaiss.dylib" build/Release/faiss_node.node
+            echo "✅ Fixed faiss_node.node libfaiss dependency"
+          fi
+          
+          OPENBLAS_OLD_NODE=$(otool -L build/Release/faiss_node.node | grep openblas | awk '{print $1}' | head -1)
+          if [ -n "$OPENBLAS_OLD_NODE" ]; then
+            OPENBLAS_NEW_NODE=$(test -f "$OPENBLAS_PATH/libopenblas.dylib" && echo "@rpath/libopenblas.dylib" || echo "@rpath/libopenblas.0.dylib")
+            if [ "$OPENBLAS_OLD_NODE" != "$OPENBLAS_NEW_NODE" ]; then
+              echo "Fixing faiss_node.node openblas path: $OPENBLAS_OLD_NODE -> $OPENBLAS_NEW_NODE"
+              install_name_tool -change "$OPENBLAS_OLD_NODE" "$OPENBLAS_NEW_NODE" build/Release/faiss_node.node
+              echo "✅ Fixed faiss_node.node openblas dependency"
+            fi
+          fi
+          
           # Add rpath to native module so it can find libraries (SIP-safe)
           install_name_tool -add_rpath "$LIBOMP_PATH" build/Release/faiss_node.node
           install_name_tool -add_rpath "$OPENBLAS_PATH" build/Release/faiss_node.node
@@ -115,7 +137,7 @@ jobs:
           echo "=== Verifying rpaths ==="
           otool -l build/Release/faiss_node.node | grep -A 2 LC_RPATH || echo "No rpaths found"
           echo ""
-          echo "=== Checking native module dependencies ==="
+          echo "=== Checking native module dependencies AFTER fix ==="
           otool -L build/Release/faiss_node.node | head -10
       
       - name: Verify native module load (macOS)
