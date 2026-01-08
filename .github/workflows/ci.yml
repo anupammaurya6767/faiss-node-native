@@ -125,8 +125,16 @@ jobs:
               fi
             fi
             
+            # Add rpaths to libfaiss.dylib so it can find its dependencies
+            echo "Adding rpaths to libfaiss.dylib"
+            install_name_tool -add_rpath "$LIBOMP_PATH" "$FAISS_PATH/libfaiss.dylib"
+            install_name_tool -add_rpath "$OPENBLAS_PATH" "$FAISS_PATH/libfaiss.dylib"
+            install_name_tool -add_rpath "@loader_path" "$FAISS_PATH/libfaiss.dylib"
+            
             echo "=== Checking libfaiss AFTER fixes ==="
             otool -L "$FAISS_PATH/libfaiss.dylib" | head -10
+            echo "=== Checking libfaiss rpaths ==="
+            otool -l "$FAISS_PATH/libfaiss.dylib" | grep -A 2 LC_RPATH || echo "No rpaths found"
           else
             echo "⚠️ libfaiss.dylib not found (may be static library)"
           fi
