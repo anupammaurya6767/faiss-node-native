@@ -1,6 +1,6 @@
 {
   "name": "@faiss-node/native",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "High-performance Node.js native bindings for Facebook FAISS - the fastest vector similarity search library. Supports FLAT_L2, IVF_FLAT, and HNSW index types with async operations, persistence, and batch search.",
   "main": "src/js/index.js",
   "types": "src/js/types.d.ts",
