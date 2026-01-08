@@ -97,9 +97,6 @@ jobs:
           npm run build
           echo "=== Checking what faiss_node.node linked against ==="
           otool -L build/Release/faiss_node.node | head -10
-        env:
-          # Ensure node-gyp finds the FAISS we just built
-          # Note: libomp paths are set in the run script above
       
       - name: Build native module (non-macOS)
         if: matrix.os != 'macos-latest'
