@@ -69,6 +69,16 @@ jobs:
           OPENBLAS_PATH=$(brew --prefix openblas)/lib
           FAISS_PATH=/usr/local/lib
           
+          echo "Library paths:"
+          echo "  libomp: $LIBOMP_PATH"
+          echo "  openblas: $OPENBLAS_PATH"
+          echo "  faiss: $FAISS_PATH"
+          
+          # Verify libraries exist
+          test -f "$LIBOMP_PATH/libomp.dylib" && echo "✅ libomp.dylib exists" || echo "❌ libomp.dylib missing"
+          test -f "$OPENBLAS_PATH/libopenblas.dylib" || test -f "$OPENBLAS_PATH/libopenblas.0.dylib" && echo "✅ libopenblas exists" || echo "❌ libopenblas missing"
+          test -f "$FAISS_PATH/libfaiss.dylib" && echo "✅ libfaiss.dylib exists" || echo "⚠️ libfaiss.dylib not found (may be static)"
+          
           # Add rpath to native module so it can find libraries (SIP-safe)
           install_name_tool -add_rpath "$LIBOMP_PATH" build/Release/faiss_node.node
           install_name_tool -add_rpath "$OPENBLAS_PATH" build/Release/faiss_node.node
@@ -78,12 +88,17 @@ jobs:
           echo "✅ Added rpaths to native module"
           echo "=== Verifying rpaths ==="
           otool -l build/Release/faiss_node.node | grep -A 2 LC_RPATH || echo "No rpaths found"
+          echo ""
+          echo "=== Checking library dependencies ==="
+          otool -L build/Release/faiss_node.node | head -10
       
       - name: Verify native module load (macOS)
         if: matrix.os == 'macos-latest'
         run: |
           echo "=== Testing module load ==="
-          node -e "try { const mod = require('./build/Release/faiss_node.node'); console.log('✅ Native module loaded successfully'); } catch(e) { console.error('❌ Failed to load:', e.message); console.error(e.stack); process.exit(1); }" || exit 1
+          # Use dtruss or set DYLD_PRINT_LIBRARIES to debug
+          export DYLD_PRINT_LIBRARIES=1
+          node -e "try { const mod = require('./build/Release/faiss_node.node'); console.log('✅ Native module loaded successfully'); } catch(e) { console.error('❌ Failed to load:', e.message); console.error(e.stack); process.exit(1); }" 2>&1 | tail -20 || exit 1
       
       - name: Run unit tests
         run: npm run test:ci
