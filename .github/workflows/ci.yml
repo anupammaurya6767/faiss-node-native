@@ -10,6 +10,10 @@ jobs:
   test:
     name: Test on ${{ matrix.os }} (Node ${{ matrix.node-version }})
     runs-on: ${{ matrix.os }}
+    env:
+      # Set OpenMP thread limit BEFORE anything runs (critical for macOS CI)
+      OMP_NUM_THREADS: 1
+      OMP_THREAD_LIMIT: 1
     strategy:
       fail-fast: false
       matrix:
