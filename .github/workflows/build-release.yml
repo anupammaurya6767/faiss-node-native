@@ -158,8 +158,13 @@ jobs:
             -DCMAKE_C_FLAGS="-fopenmp"
           cmake --build build -j$(nproc)
           sudo cmake --install build
-          # Verify FAISS headers are installed
-          ls -la /usr/local/include/faiss/ | head -5 || echo "FAISS headers not found"
+          # Verify FAISS headers are installed (critical check)
+          if [ ! -f /usr/local/include/faiss/impl/FaissAssert.h ]; then
+            echo "ERROR: FAISS headers not found at /usr/local/include/faiss/"
+            ls -la /usr/local/include/faiss/ || echo "Directory doesn't exist"
+            exit 1
+          fi
+          echo "✅ FAISS headers verified: /usr/local/include/faiss/impl/FaissAssert.h exists"
           cd -
       
       - name: Install npm dependencies

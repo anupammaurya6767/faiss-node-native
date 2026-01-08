@@ -25,6 +25,9 @@ RUN git clone https://github.com/facebookresearch/faiss.git /tmp/faiss && \
         -DCMAKE_C_FLAGS="-fopenmp" && \
     cmake --build build -j$(nproc) && \
     cmake --install build && \
+    # Verify FAISS headers are installed (critical check)
+    test -f /usr/local/include/faiss/impl/FaissAssert.h || (echo "ERROR: FAISS headers not found" && ls -la /usr/local/include/faiss/ && exit 1) && \
+    echo "✅ FAISS headers verified" && \
     cd / && \
     rm -rf /tmp/faiss
 
@@ -36,6 +39,10 @@ RUN npm ci --ignore-scripts
 
 # Copy source code
 COPY . .
+
+# Verify FAISS headers before building native module
+RUN test -f /usr/local/include/faiss/impl/FaissAssert.h || (echo "ERROR: FAISS headers missing before build" && ls -la /usr/local/include/faiss/ && exit 1) && \
+    echo "✅ FAISS headers verified before native module build"
 
 # Build native module
 RUN npm run build
