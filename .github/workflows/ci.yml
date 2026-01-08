@@ -77,7 +77,33 @@ jobs:
           # Verify libraries exist
           test -f "$LIBOMP_PATH/libomp.dylib" && echo "✅ libomp.dylib exists" || echo "❌ libomp.dylib missing"
           test -f "$OPENBLAS_PATH/libopenblas.dylib" || test -f "$OPENBLAS_PATH/libopenblas.0.dylib" && echo "✅ libopenblas exists" || echo "❌ libopenblas missing"
-          test -f "$FAISS_PATH/libfaiss.dylib" && echo "✅ libfaiss.dylib exists" || echo "⚠️ libfaiss.dylib not found (may be static)"
+          
+          # CRITICAL: Fix libfaiss.dylib's dependency on libomp
+          # libfaiss.dylib itself depends on libomp, and if it can't find it, it crashes
+          if [ -f "$FAISS_PATH/libfaiss.dylib" ]; then
+            echo "✅ libfaiss.dylib exists (dynamic)"
+            echo "=== Checking libfaiss dependencies ==="
+            otool -L "$FAISS_PATH/libfaiss.dylib" | head -10
+            # Find the current libomp path in libfaiss and fix it
+            LIBOMP_OLD=$(otool -L "$FAISS_PATH/libfaiss.dylib" | grep libomp | awk '{print $1}' | head -1)
+            if [ -n "$LIBOMP_OLD" ] && [ "$LIBOMP_OLD" != "$LIBOMP_PATH/libomp.dylib" ]; then
+              echo "Fixing libfaiss libomp path: $LIBOMP_OLD -> $LIBOMP_PATH/libomp.dylib"
+              install_name_tool -change "$LIBOMP_OLD" "$LIBOMP_PATH/libomp.dylib" "$FAISS_PATH/libfaiss.dylib"
+              echo "✅ Fixed libfaiss libomp dependency"
+            fi
+            # Also fix openblas if needed
+            OPENBLAS_OLD=$(otool -L "$FAISS_PATH/libfaiss.dylib" | grep openblas | awk '{print $1}' | head -1)
+            if [ -n "$OPENBLAS_OLD" ]; then
+              OPENBLAS_NEW=$(test -f "$OPENBLAS_PATH/libopenblas.dylib" && echo "$OPENBLAS_PATH/libopenblas.dylib" || echo "$OPENBLAS_PATH/libopenblas.0.dylib")
+              if [ "$OPENBLAS_OLD" != "$OPENBLAS_NEW" ]; then
+                echo "Fixing libfaiss openblas path: $OPENBLAS_OLD -> $OPENBLAS_NEW"
+                install_name_tool -change "$OPENBLAS_OLD" "$OPENBLAS_NEW" "$FAISS_PATH/libfaiss.dylib"
+                echo "✅ Fixed libfaiss openblas dependency"
+              fi
+            fi
+          else
+            echo "⚠️ libfaiss.dylib not found (may be static library)"
+          fi
           
           # Add rpath to native module so it can find libraries (SIP-safe)
           install_name_tool -add_rpath "$LIBOMP_PATH" build/Release/faiss_node.node
@@ -89,16 +115,14 @@ jobs:
           echo "=== Verifying rpaths ==="
           otool -l build/Release/faiss_node.node | grep -A 2 LC_RPATH || echo "No rpaths found"
           echo ""
-          echo "=== Checking library dependencies ==="
+          echo "=== Checking native module dependencies ==="
           otool -L build/Release/faiss_node.node | head -10
       
       - name: Verify native module load (macOS)
         if: matrix.os == 'macos-latest'
         run: |
           echo "=== Testing module load ==="
-          # Use dtruss or set DYLD_PRINT_LIBRARIES to debug
-          export DYLD_PRINT_LIBRARIES=1
-          node -e "try { const mod = require('./build/Release/faiss_node.node'); console.log('✅ Native module loaded successfully'); } catch(e) { console.error('❌ Failed to load:', e.message); console.error(e.stack); process.exit(1); }" 2>&1 | tail -20 || exit 1
+          node -e "try { const mod = require('./build/Release/faiss_node.node'); console.log('✅ Native module loaded successfully'); } catch(e) { console.error('❌ Failed to load:', e.message); console.error(e.stack); process.exit(1); }" || exit 1
       
       - name: Run unit tests
         run: npm run test:ci
