@@ -18,7 +18,9 @@ RUN git clone https://github.com/facebookresearch/faiss.git /tmp/faiss && \
     cmake -B build \
         -DFAISS_ENABLE_GPU=OFF \
         -DFAISS_ENABLE_PYTHON=OFF \
-        -DCMAKE_BUILD_TYPE=Release && \
+        -DBUILD_TESTING=OFF \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr/local && \
     cmake --build build -j$(nproc) && \
     cmake --install build && \
     cd / && \
