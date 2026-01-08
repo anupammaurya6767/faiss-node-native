@@ -84,6 +84,13 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
       
+      - name: Verify FAISS before build
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          # Double-check headers are accessible
+          test -f /usr/local/include/faiss/impl/FaissAssert.h || (echo "ERROR: Headers missing before build" && exit 1)
+          echo "✅ Headers verified before native module build"
+      
       - name: Build native module
         run: npm run build
       
