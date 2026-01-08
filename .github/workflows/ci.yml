@@ -269,10 +269,22 @@ jobs:
             echo "⚠️ libomp path is already @rpath or not found"
           fi
           
+          # CRITICAL: Copy libomp.dylib to build directory (like reference repo)
+          # This allows @loader_path to find it, which is more reliable than system paths
+          echo "=== Copying libomp.dylib to build directory ==="
+          cp /usr/local/lib/libomp.dylib build/Release/libomp.dylib || (echo "❌ Failed to copy libomp" && exit 1)
+          test -f build/Release/libomp.dylib && echo "✅ libomp.dylib copied to build directory" || (echo "❌ libomp.dylib not in build directory" && exit 1)
+          
+          # Fix libomp install name in the copied file to use @rpath
+          install_name_tool -id "@rpath/libomp.dylib" build/Release/libomp.dylib
+          
           # Add rpath to native module so it can find libraries (SIP-safe)
-          # Since all libraries are now in /usr/local/lib, we only need one rpath
-          install_name_tool -add_rpath "/usr/local/lib" build/Release/faiss_node.node
+          # Use @loader_path first (finds libomp in same directory), then system paths
           install_name_tool -add_rpath "@loader_path" build/Release/faiss_node.node
+          install_name_tool -add_rpath "/usr/local/lib" build/Release/faiss_node.node
+          # Also add Homebrew paths for compatibility
+          install_name_tool -add_rpath "/opt/homebrew/opt/libomp/lib" build/Release/faiss_node.node
+          install_name_tool -add_rpath "/usr/local/opt/libomp/lib" build/Release/faiss_node.node
           
           echo "✅ Added rpaths to native module"
           echo "=== Verifying rpaths ==="
