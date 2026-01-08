@@ -1,6 +1,8 @@
-# FAISS-Node
+# @faiss-node/native
 
-A Node.js native binding for Facebook FAISS vector similarity search. I built this to provide a clean, modern API for FAISS with comprehensive testing and full TypeScript support.
+High-performance Node.js native bindings for Facebook FAISS - the industry-standard vector similarity search library. Built with ❤️ for production-ready semantic search, RAG applications, and vector databases.
+
+I created this package because I needed a fast, reliable, and well-tested FAISS binding for Node.js. After working with various vector search solutions, I decided to build something that combines the power of FAISS with a clean, modern JavaScript API.
 
 ## Current Status: Phase 2 Complete ✅
 
