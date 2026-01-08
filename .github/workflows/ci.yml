@@ -95,29 +95,38 @@ jobs:
           test -f "$LIBOMP_PATH/libomp.dylib" && echo "✅ libomp.dylib exists" || echo "❌ libomp.dylib missing"
           test -f "$OPENBLAS_PATH/libopenblas.dylib" || test -f "$OPENBLAS_PATH/libopenblas.0.dylib" && echo "✅ libopenblas exists" || echo "❌ libopenblas missing"
           
-          # CRITICAL: Fix libfaiss.dylib's dependency on libomp
+          # CRITICAL: Fix libfaiss.dylib's install name and dependencies
           # libfaiss.dylib itself depends on libomp, and if it can't find it, it crashes
           if [ -f "$FAISS_PATH/libfaiss.dylib" ]; then
             echo "✅ libfaiss.dylib exists (dynamic)"
-            echo "=== Checking libfaiss dependencies ==="
+            echo "=== Checking libfaiss BEFORE fixes ==="
             otool -L "$FAISS_PATH/libfaiss.dylib" | head -10
-            # Find the current libomp path in libfaiss and fix it
+            
+            # First, set libfaiss.dylib's own install name to use @rpath
+            echo "Setting libfaiss.dylib install name to @rpath/libfaiss.dylib"
+            install_name_tool -id "@rpath/libfaiss.dylib" "$FAISS_PATH/libfaiss.dylib"
+            
+            # Find the current libomp path in libfaiss and fix it to use @rpath
             LIBOMP_OLD=$(otool -L "$FAISS_PATH/libfaiss.dylib" | grep libomp | awk '{print $1}' | head -1)
-            if [ -n "$LIBOMP_OLD" ] && [ "$LIBOMP_OLD" != "$LIBOMP_PATH/libomp.dylib" ]; then
-              echo "Fixing libfaiss libomp path: $LIBOMP_OLD -> $LIBOMP_PATH/libomp.dylib"
-              install_name_tool -change "$LIBOMP_OLD" "$LIBOMP_PATH/libomp.dylib" "$FAISS_PATH/libfaiss.dylib"
+            if [ -n "$LIBOMP_OLD" ] && [ "$LIBOMP_OLD" != "@rpath/libomp.dylib" ]; then
+              echo "Fixing libfaiss libomp path: $LIBOMP_OLD -> @rpath/libomp.dylib"
+              install_name_tool -change "$LIBOMP_OLD" "@rpath/libomp.dylib" "$FAISS_PATH/libfaiss.dylib"
               echo "✅ Fixed libfaiss libomp dependency"
             fi
-            # Also fix openblas if needed
+            
+            # Also fix openblas to use @rpath
             OPENBLAS_OLD=$(otool -L "$FAISS_PATH/libfaiss.dylib" | grep openblas | awk '{print $1}' | head -1)
             if [ -n "$OPENBLAS_OLD" ]; then
-              OPENBLAS_NEW=$(test -f "$OPENBLAS_PATH/libopenblas.dylib" && echo "$OPENBLAS_PATH/libopenblas.dylib" || echo "$OPENBLAS_PATH/libopenblas.0.dylib")
-              if [ "$OPENBLAS_OLD" != "$OPENBLAS_NEW" ]; then
+              OPENBLAS_NEW=$(test -f "$OPENBLAS_PATH/libopenblas.dylib" && echo "@rpath/libopenblas.dylib" || echo "@rpath/libopenblas.0.dylib")
+              if [ "$OPENBLAS_OLD" != "$OPENBLAS_NEW" ] && [ "$OPENBLAS_OLD" != "@rpath/libopenblas.dylib" ] && [ "$OPENBLAS_OLD" != "@rpath/libopenblas.0.dylib" ]; then
                 echo "Fixing libfaiss openblas path: $OPENBLAS_OLD -> $OPENBLAS_NEW"
                 install_name_tool -change "$OPENBLAS_OLD" "$OPENBLAS_NEW" "$FAISS_PATH/libfaiss.dylib"
                 echo "✅ Fixed libfaiss openblas dependency"
               fi
             fi
+            
+            echo "=== Checking libfaiss AFTER fixes ==="
+            otool -L "$FAISS_PATH/libfaiss.dylib" | head -10
           else
             echo "⚠️ libfaiss.dylib not found (may be static library)"
           fi
