@@ -110,16 +110,31 @@ jobs:
           fi
           
           # Check if openblas exists in Homebrew location
-          OPENBLAS_FILE=$(test -f "$OPENBLAS_PATH/libopenblas.dylib" && echo "$OPENBLAS_PATH/libopenblas.dylib" || echo "$OPENBLAS_PATH/libopenblas.0.dylib")
-          if [ -f "$OPENBLAS_FILE" ]; then
-            OPENBLAS_BASENAME=$(basename "$OPENBLAS_FILE")
-            if [ ! -f "/usr/local/lib/$OPENBLAS_BASENAME" ]; then
-              echo "Copying $OPENBLAS_BASENAME from $OPENBLAS_PATH to /usr/local/lib"
-              sudo cp "$OPENBLAS_FILE" /usr/local/lib/ || (echo "❌ Failed to copy openblas" && exit 1)
-              # Verify copy succeeded
-              test -f "/usr/local/lib/$OPENBLAS_BASENAME" && echo "✅ $OPENBLAS_BASENAME copied successfully" || (echo "❌ $OPENBLAS_BASENAME copy failed" && exit 1)
+          # We need to copy BOTH libopenblas.dylib and libopenblas.0.dylib if they exist
+          # And create a symlink if needed
+          if [ -f "$OPENBLAS_PATH/libopenblas.0.dylib" ]; then
+            if [ ! -f "/usr/local/lib/libopenblas.0.dylib" ]; then
+              echo "Copying libopenblas.0.dylib from $OPENBLAS_PATH to /usr/local/lib"
+              sudo cp "$OPENBLAS_PATH/libopenblas.0.dylib" /usr/local/lib/ || (echo "❌ Failed to copy openblas.0" && exit 1)
+              test -f "/usr/local/lib/libopenblas.0.dylib" && echo "✅ libopenblas.0.dylib copied successfully" || (echo "❌ libopenblas.0.dylib copy failed" && exit 1)
             else
-              echo "✅ $OPENBLAS_BASENAME already exists in /usr/local/lib"
+              echo "✅ libopenblas.0.dylib already exists in /usr/local/lib"
+            fi
+            # Create symlink libopenblas.dylib -> libopenblas.0.dylib for compatibility
+            if [ ! -f "/usr/local/lib/libopenblas.dylib" ]; then
+              echo "Creating symlink libopenblas.dylib -> libopenblas.0.dylib"
+              sudo ln -s libopenblas.0.dylib /usr/local/lib/libopenblas.dylib || (echo "❌ Failed to create symlink" && exit 1)
+              test -L "/usr/local/lib/libopenblas.dylib" && echo "✅ symlink created successfully" || (echo "❌ symlink creation failed" && exit 1)
+            else
+              echo "✅ libopenblas.dylib already exists in /usr/local/lib"
+            fi
+          elif [ -f "$OPENBLAS_PATH/libopenblas.dylib" ]; then
+            if [ ! -f "/usr/local/lib/libopenblas.dylib" ]; then
+              echo "Copying libopenblas.dylib from $OPENBLAS_PATH to /usr/local/lib"
+              sudo cp "$OPENBLAS_PATH/libopenblas.dylib" /usr/local/lib/ || (echo "❌ Failed to copy openblas" && exit 1)
+              test -f "/usr/local/lib/libopenblas.dylib" && echo "✅ libopenblas.dylib copied successfully" || (echo "❌ libopenblas.dylib copy failed" && exit 1)
+            else
+              echo "✅ libopenblas.dylib already exists in /usr/local/lib"
             fi
           else
             echo "❌ openblas not found in $OPENBLAS_PATH"
@@ -219,13 +234,14 @@ jobs:
           echo "Current openblas path in faiss_node.node: $OPENBLAS_OLD_NODE"
           
           if [ -n "$OPENBLAS_OLD_NODE" ]; then
-            OPENBLAS_NEW_NODE=$(test -f "$OPENBLAS_PATH/libopenblas.dylib" && echo "@rpath/libopenblas.dylib" || echo "@rpath/libopenblas.0.dylib")
-            if [ "$OPENBLAS_OLD_NODE" != "$OPENBLAS_NEW_NODE" ] && [ "$OPENBLAS_OLD_NODE" != "@rpath/libopenblas.dylib" ] && [ "$OPENBLAS_OLD_NODE" != "@rpath/libopenblas.0.dylib" ]; then
+            # Always use libopenblas.dylib (we create symlink if needed)
+            OPENBLAS_NEW_NODE="@rpath/libopenblas.dylib"
+            if [ "$OPENBLAS_OLD_NODE" != "$OPENBLAS_NEW_NODE" ] && [ "$OPENBLAS_OLD_NODE" != "@rpath/libopenblas.dylib" ]; then
               echo "Fixing faiss_node.node openblas path: $OPENBLAS_OLD_NODE -> $OPENBLAS_NEW_NODE"
               install_name_tool -change "$OPENBLAS_OLD_NODE" "$OPENBLAS_NEW_NODE" build/Release/faiss_node.node
               echo "✅ Fixed faiss_node.node openblas dependency"
             else
-              echo "⚠️ openblas path is already @rpath or correct"
+              echo "⚠️ openblas path is already @rpath/libopenblas.dylib"
             fi
           fi
           
