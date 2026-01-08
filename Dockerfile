@@ -60,9 +60,17 @@ RUN ldconfig
 # Set library path for runtime (critical for native module to find libgomp, libfaiss, etc.)
 ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/lib/x86_64-linux-gnu
 # Verify libraries are accessible and in cache
-RUN ldconfig -p | grep -E "(libgomp|libfaiss|libopenblas)" && echo "✅ Libraries found in cache" || (echo "❌ Libraries not in cache" && ldconfig -p)
-# Verify native module can find its dependencies
-RUN ldd build/Release/faiss_node.node | grep -E "(libgomp|libfaiss|libopenblas)" && echo "✅ Native module dependencies resolved" || (echo "❌ Missing dependencies:" && ldd build/Release/faiss_node.node)
+RUN echo "=== Checking library cache ===" && \
+    ldconfig -p | grep -E "(libgomp|libfaiss|libopenblas)" && echo "✅ Libraries found in cache" || (echo "❌ Libraries not in cache" && ldconfig -p | head -20)
+# Verify native module exists and can find its dependencies
+RUN echo "=== Checking native module dependencies ===" && \
+    test -f build/Release/faiss_node.node && echo "✅ Native module exists" || (echo "❌ Native module missing" && ls -la build/Release/ 2>&1) && \
+    ldd build/Release/faiss_node.node 2>&1 | head -30 && \
+    ldd build/Release/faiss_node.node | grep -E "(libgomp|libfaiss|libopenblas)" && echo "✅ All dependencies found" || echo "⚠️ Some dependencies may be missing"
+# Test native module can be loaded by Node.js (critical check before Jest)
+RUN echo "=== Testing native module load ===" && \
+    node -e "try { const mod = require('./build/Release/faiss_node.node'); console.log('✅ Native module loaded successfully'); } catch(e) { console.error('❌ Failed to load:', e.message); process.exit(1); }" || (echo "❌ Native module load test failed" && exit 1)
+# Run tests with single worker to avoid conflicts
 RUN npm run test:ci
 
 # Production stage
