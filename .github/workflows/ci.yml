@@ -265,12 +265,16 @@ jobs:
           echo ""
           echo "=== Testing simple module load (no DYLD_PRINT) ==="
           # Simple test without verbose output
+          export OMP_NUM_THREADS=1
           node -e "try { const mod = require('./build/Release/faiss_node.node'); console.log('✅ Native module loaded successfully'); } catch(e) { console.error('❌ Failed to load:', e.message); console.error(e.stack); process.exit(1); }" || exit 1
           
           echo ""
           echo "=== Testing module initialization ==="
           # Test if we can actually create an instance
+          export OMP_NUM_THREADS=1
           node -e "try { const { FaissIndex } = require('./src/js/index.js'); const index = new FaissIndex({ type: 'FLAT_L2', dims: 128 }); console.log('✅ FaissIndex created successfully'); } catch(e) { console.error('❌ Failed to create index:', e.message); console.error(e.stack); process.exit(1); }" || exit 1
+        env:
+          OMP_NUM_THREADS: 1
       
       - name: Run unit tests
         if: matrix.os == 'macos-latest'
