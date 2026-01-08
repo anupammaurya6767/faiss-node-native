@@ -28,6 +28,9 @@
               "-std=c++17",
               "-fexceptions",
               "-frtti"
+            ],
+            "OTHER_LDFLAGS": [
+              "-headerpad_max_install_names"
             ]
           },
           "libraries": [
@@ -39,7 +42,8 @@
           ],
           "ldflags": [
             "-L/opt/homebrew/lib",
-            "-L/opt/homebrew/Cellar/openblas/0.3.30/lib"
+            "-L/opt/homebrew/Cellar/openblas/0.3.30/lib",
+            "-headerpad_max_install_names"
           ]
         }],
         ["OS=='linux'", {
