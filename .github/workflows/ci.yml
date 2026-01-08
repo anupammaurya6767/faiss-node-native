@@ -191,16 +191,29 @@ jobs:
       - name: Verify native module load (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          echo "=== Testing module load with library tracing ==="
-          # Use DYLD_PRINT_LIBRARIES to see what libraries are being loaded
-          export DYLD_PRINT_LIBRARIES=1
-          export DYLD_PRINT_LIBRARIES_POST_LAUNCH=1
-          node -e "try { const mod = require('./build/Release/faiss_node.node'); console.log('✅ Native module loaded successfully'); } catch(e) { console.error('❌ Failed to load:', e.message); console.error(e.stack); process.exit(1); }" 2>&1 | grep -E "(dyld|library|error|missing)" | head -30 || echo "No library errors found in output"
+          echo "=== Verifying library files exist ==="
+          ls -la /usr/local/lib/libfaiss* /usr/local/lib/libomp* /usr/local/lib/libopenblas* 2>&1 || echo "Some libraries missing"
           echo ""
-          echo "=== Testing without tracing ==="
-          unset DYLD_PRINT_LIBRARIES
-          unset DYLD_PRINT_LIBRARIES_POST_LAUNCH
+          echo "=== Testing module load ==="
+          # Try to load and see what happens
           node -e "try { const mod = require('./build/Release/faiss_node.node'); console.log('✅ Native module loaded successfully'); } catch(e) { console.error('❌ Failed to load:', e.message); console.error(e.stack); process.exit(1); }" || exit 1
+          
+          echo ""
+          echo "=== Testing with dtruss to see system calls ==="
+          # Use dtruss to see what's actually happening (if available)
+          which dtruss > /dev/null && sudo dtruss -f node -e "require('./build/Release/faiss_node.node')" 2>&1 | grep -E "(open|stat64|libfaiss|libomp|libopenblas)" | head -20 || echo "dtruss not available, trying alternative"
+          
+          echo ""
+          echo "=== Checking if libraries can be dlopen'd ==="
+          node -e "
+            const { dlopen } = require('process').dlopen;
+            try {
+              dlopen(require('./build/Release/faiss_node.node'), require('./build/Release/faiss_node.node').RTLD_NOW);
+              console.log('✅ dlopen succeeded');
+            } catch(e) {
+              console.error('❌ dlopen failed:', e.message);
+            }
+          " || echo "dlopen test skipped"
       
       - name: Run unit tests
         run: npm run test:ci
