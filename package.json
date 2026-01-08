@@ -8,7 +8,7 @@
     "build": "node-gyp rebuild",
     "clean": "node-gyp clean",
     "test": "jest",
-    "test:ci": "jest --ci --coverage --maxWorkers=2 --testPathIgnorePatterns=manual",
+    "test:ci": "jest --ci --coverage --config=jest.ci.config.js --testPathIgnorePatterns=manual",
     "test:unit": "jest test/unit",
     "test:integration": "jest test/integration",
     "test:watch": "jest --watch",
