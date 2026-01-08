@@ -83,17 +83,23 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           echo "=== Building native module ==="
+          LIBOMP_PREFIX=$(brew --prefix libomp)
+          echo "LIBOMP_PREFIX: $LIBOMP_PREFIX"
           echo "LDFLAGS: $LDFLAGS"
           echo "CPPFLAGS: $CPPFLAGS"
           echo "Checking for FAISS library..."
           ls -la /usr/local/lib/libfaiss* || echo "⚠️ No libfaiss found"
+          echo "Checking for libomp..."
+          ls -la "$LIBOMP_PREFIX/lib/libomp.dylib" || echo "⚠️ No libomp found"
           npm run build
           echo "=== Checking what faiss_node.node linked against ==="
           otool -L build/Release/faiss_node.node | head -10
         env:
-          # Ensure node-gyp finds the FAISS we just built
-          LDFLAGS: "-L/usr/local/lib"
-          CPPFLAGS: "-I/usr/local/include"
+          # Ensure node-gyp finds the FAISS and libomp we just built
+          # libomp is keg-only, so we need to add its path explicitly
+          LIBOMP_PREFIX: "$(brew --prefix libomp)"
+          LDFLAGS: "-L/usr/local/lib -L$(brew --prefix libomp)/lib"
+          CPPFLAGS: "-I/usr/local/include -I$(brew --prefix libomp)/include"
       
       - name: Build native module (non-macOS)
         if: matrix.os != 'macos-latest'
