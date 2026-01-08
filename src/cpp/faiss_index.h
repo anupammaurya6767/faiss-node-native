@@ -9,7 +9,7 @@
 
 // Forward declarations - full definitions in .cpp file
 namespace faiss {
-    class Index;
+    struct Index;  // FAISS defines Index as struct, not class
     using idx_t = int64_t;  // idx_t is int64_t (defined in MetricType.h)
 }
 
