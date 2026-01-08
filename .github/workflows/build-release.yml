@@ -22,7 +22,14 @@ jobs:
       
       - name: Install dependencies
         run: |
-          brew install cmake libomp openblas faiss
+          brew install cmake libomp openblas
+          # FAISS needs to be built from source on macOS GitHub Actions
+          git clone https://github.com/facebookresearch/faiss.git /tmp/faiss
+          cd /tmp/faiss
+          cmake -B build -DFAISS_ENABLE_GPU=OFF -DFAISS_ENABLE_PYTHON=OFF .
+          cmake --build build -j$(sysctl -n hw.ncpu)
+          sudo cmake --install build
+          cd -
       
       - name: Install npm dependencies
         run: npm ci
@@ -59,7 +66,14 @@ jobs:
       
       - name: Install dependencies
         run: |
-          brew install cmake libomp openblas faiss
+          brew install cmake libomp openblas
+          # FAISS needs to be built from source on macOS GitHub Actions
+          git clone https://github.com/facebookresearch/faiss.git /tmp/faiss
+          cd /tmp/faiss
+          cmake -B build -DFAISS_ENABLE_GPU=OFF -DFAISS_ENABLE_PYTHON=OFF .
+          cmake --build build -j$(sysctl -n hw.ncpu)
+          sudo cmake --install build
+          cd -
       
       - name: Install npm dependencies
         run: npm ci
