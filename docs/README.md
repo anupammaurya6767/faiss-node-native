@@ -4,7 +4,7 @@ This directory contains the auto-generated API documentation that I set up using
 
 ## Viewing Documentation
 
-- **Online**: Visit [GitHub Pages](https://<username>.github.io/<repo>/docs/) (after first deployment)
+- **Online**: Visit [GitHub Pages](https://anupammaurya6767.github.io/faiss-node-native/) (automatically deployed)
 - **Local**: Run `npm run docs:serve` and visit http://localhost:8000
 
 ## Generating Documentation

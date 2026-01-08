@@ -2,8 +2,6 @@
 
 Thank you for your interest in contributing to @faiss-node/native! I'm Anupam Maurya, the maintainer of this project, and I welcome contributions from the community.
 
-Thanks for checking out the project! I'd love to have your contributions.
-
 ## Development Setup
 
 1. **Clone the repository**
@@ -84,4 +82,12 @@ To add a new FAISS index type:
 
 ## Questions?
 
-Open an issue for questions or discussions.
+If you have questions, feel free to:
+- Open an issue on [GitHub](https://github.com/anupammaurya6767/faiss-node-native/issues)
+- Reach out to me directly: anupammaurya6767@gmail.com
+
+## Maintainer
+
+**Anupam Maurya**
+- GitHub: [@anupammaurya6767](https://github.com/anupammaurya6767)
+- Email: anupammaurya6767@gmail.com
