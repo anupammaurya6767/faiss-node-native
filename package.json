@@ -1,9 +1,38 @@
 {
   "name": "@faiss-node/native",
   "version": "0.1.0",
-  "description": "Node.js native binding for Facebook FAISS vector similarity search",
+  "description": "High-performance Node.js native bindings for Facebook FAISS - the fastest vector similarity search library. Supports FLAT_L2, IVF_FLAT, and HNSW index types with async operations, persistence, and batch search.",
   "main": "src/js/index.js",
   "types": "src/js/types.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anupammaurya6767/faiss-node-native.git"
+  },
+  "homepage": "https://github.com/anupammaurya6767/faiss-node-native#readme",
+  "bugs": {
+    "url": "https://github.com/anupammaurya6767/faiss-node-native/issues"
+  },
+  "author": "Anupam Maurya <anupammaurya6767@gmail.com>",
+  "license": "MIT",
+  "keywords": [
+    "faiss",
+    "vector",
+    "similarity",
+    "search",
+    "embedding",
+    "nearest-neighbor",
+    "ann",
+    "approximate-nearest-neighbor",
+    "machine-learning",
+    "ai",
+    "semantic-search",
+    "rag",
+    "vector-database",
+    "hnsw",
+    "ivf",
+    "native",
+    "performance"
+  ],
   "scripts": {
     "build": "node-gyp rebuild",
     "clean": "node-gyp clean",
@@ -20,16 +49,6 @@
     "publish:local": "bash -c 'export NODE_AUTH_TOKEN=$(grep NPM_TOKEN .env | cut -d \\\"=\\\" -f2) && npm config set //registry.npmjs.org/:_authToken $NODE_AUTH_TOKEN && npm publish --access public'",
     "publish:dry-run": "bash -c 'export NODE_AUTH_TOKEN=$(grep NPM_TOKEN .env | cut -d \\\"=\\\" -f2) && npm config set //registry.npmjs.org/:_authToken $NODE_AUTH_TOKEN && npm publish --access public --dry-run'"
   },
-  "keywords": [
-    "faiss",
-    "vector",
-    "similarity",
-    "search",
-    "embedding",
-    "nearest-neighbor"
-  ],
-  "author": "",
-  "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
   },

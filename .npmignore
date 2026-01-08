@@ -1,0 +1,63 @@
+# Development files
+node_modules/
+.env
+.env.local
+*.log
+.DS_Store
+
+# Build artifacts
+build/
+*.node
+*.o
+*.a
+*.dylib
+*.so
+
+# Test files
+test/
+coverage/
+*.test.js
+jest.config.js
+jest.ci.config.js
+
+# Documentation (generated)
+docs/html/
+docs/latex/
+
+# CI/CD
+.github/
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Scripts (development only)
+scripts/
+
+# Documentation files (keep README, exclude others)
+PHASE*.md
+TEST_RESULTS.md
+CONTRIBUTING.md
+PUBLISHING_GUIDE.md
+Doxyfile
+CMakeLists.txt
+
+# Examples (keep basic ones, exclude complex)
+examples/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/

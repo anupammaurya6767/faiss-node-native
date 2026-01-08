@@ -297,3 +297,20 @@ See `.github/PAGES_SETUP.md` for detailed setup instructions.
 ## License
 
 MIT
+
+## Author
+
+**Anupam Maurya**
+
+- GitHub: [@anupammaurya6767](https://github.com/anupammaurya6767)
+- Email: anupammaurya6767@gmail.com
+
+## Acknowledgments
+
+- Built on top of [Facebook FAISS](https://github.com/facebookresearch/faiss) - the amazing vector similarity search library
+- Inspired by the need for high-performance vector search in Node.js applications
+- Thanks to the open-source community for their contributions and feedback
+
+---
+
+Made with ❤️ for the Node.js community
