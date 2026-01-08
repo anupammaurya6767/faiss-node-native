@@ -47,11 +47,18 @@
             "-L/usr/local/lib",
             "-L/usr/lib",
             "-lfaiss",
-            "-lopenblas"
+            "-lopenblas",
+            "-lgomp"
           ],
           "ldflags": [
             "-L/usr/local/lib",
             "-L/usr/lib"
+          ],
+          "cflags_cc": [
+            "-std=c++17",
+            "-fexceptions",
+            "-frtti",
+            "-fopenmp"
           ]
         }]
       ],

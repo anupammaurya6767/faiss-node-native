@@ -20,7 +20,9 @@ RUN git clone https://github.com/facebookresearch/faiss.git /tmp/faiss && \
         -DFAISS_ENABLE_PYTHON=OFF \
         -DBUILD_TESTING=OFF \
         -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX=/usr/local && \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DCMAKE_CXX_FLAGS="-fopenmp" \
+        -DCMAKE_C_FLAGS="-fopenmp" && \
     cmake --build build -j$(nproc) && \
     cmake --install build && \
     cd / && \
