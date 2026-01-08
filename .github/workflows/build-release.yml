@@ -145,9 +145,14 @@ jobs:
           # Build FAISS from source
           git clone https://github.com/facebookresearch/faiss.git /tmp/faiss
           cd /tmp/faiss
-          cmake -B build -DFAISS_ENABLE_GPU=OFF -DFAISS_ENABLE_PYTHON=OFF .
+          cmake -B build \
+            -DFAISS_ENABLE_GPU=OFF \
+            -DFAISS_ENABLE_PYTHON=OFF \
+            -DCMAKE_INSTALL_PREFIX=/usr/local
           cmake --build build -j$(nproc)
           sudo cmake --install build
+          # Verify FAISS headers are installed
+          ls -la /usr/local/include/faiss/ | head -5 || echo "FAISS headers not found"
           cd -
       
       - name: Install npm dependencies
