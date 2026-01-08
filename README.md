@@ -273,7 +273,7 @@ I've set up automated documentation generation using Doxygen, which gets deploye
 
 ### Viewing Documentation
 
-- **Online**: [GitHub Pages](https://<username>.github.io/<repo>/docs/) (after first deployment)
+- **Online**: [GitHub Pages](https://anupammaurya6767.github.io/faiss-node-native/) (automatically deployed)
 - **Local**: Run `npm run docs:serve` and visit http://localhost:8000
 
 ### Generating Locally
