@@ -46,16 +46,22 @@ jobs:
           export OpenMP_C_LIB_NAMES="omp"
           export OpenMP_gomp_LIBRARY="${LIBOMP_PREFIX}/lib/libomp.dylib"
           # Set environment variables for CMake to find OpenMP (keg-only packages)
+          # Reference repo approach: Set LDFLAGS/CPPFLAGS so CMake's FindOpenMP can find it
           export LDFLAGS="-L${LIBOMP_PREFIX}/lib"
           export CPPFLAGS="-I${LIBOMP_PREFIX}/include"
           export CMAKE_PREFIX_PATH="${LIBOMP_PREFIX}"
           
           # Build FAISS with OpenMP (required - FAISS needs it)
           # We'll limit threads at runtime via OMP_NUM_THREADS=1
+          # Reference repo approach: Manually set OpenMP variables if FindOpenMP fails
           cmake -B build \
             -DFAISS_ENABLE_GPU=OFF \
             -DFAISS_ENABLE_PYTHON=OFF \
             -DBUILD_TESTING=OFF \
+            -DCMAKE_CXX_FLAGS="-Xpreprocessor -fopenmp -Wno-unused-command-line-argument -I${LIBOMP_PREFIX}/include" \
+            -DCMAKE_C_FLAGS="-Xpreprocessor -fopenmp -Wno-unused-command-line-argument -I${LIBOMP_PREFIX}/include" \
+            -DCMAKE_EXE_LINKER_FLAGS="-L${LIBOMP_PREFIX}/lib -lomp" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-L${LIBOMP_PREFIX}/lib -lomp" \
             -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -Wno-unused-command-line-argument -I${LIBOMP_PREFIX}/include" \
             -DOpenMP_CXX_LIB_NAMES="omp" \
             -DOpenMP_omp_LIBRARY="${LIBOMP_PREFIX}/lib/libomp.dylib" \
