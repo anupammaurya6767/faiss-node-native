@@ -68,67 +68,6 @@ jobs:
           name: macos-arm64
           path: dist/faiss-node-macos-arm64.tar.gz
 
-  build-macos-x64:
-    name: Build macOS x64
-    runs-on: macos-13  # x64 runner (macos-12 deprecated)
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: |
-          brew install cmake libomp openblas
-          # FAISS needs to be built from source on macOS GitHub Actions
-          LIBOMP_PREFIX=$(brew --prefix libomp)
-          git clone https://github.com/facebookresearch/faiss.git /tmp/faiss
-          cd /tmp/faiss
-          # Set OpenMP paths for CMake (both C and CXX) - include path is critical for omp.h
-          export OpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -Wno-unused-command-line-argument -I${LIBOMP_PREFIX}/include"
-          export OpenMP_CXX_LIB_NAMES="omp"
-          export OpenMP_omp_LIBRARY="${LIBOMP_PREFIX}/lib/libomp.dylib"
-          export OpenMP_C_FLAGS="-Xpreprocessor -fopenmp -Wno-unused-command-line-argument -I${LIBOMP_PREFIX}/include"
-          export OpenMP_C_LIB_NAMES="omp"
-          export OpenMP_gomp_LIBRARY="${LIBOMP_PREFIX}/lib/libomp.dylib"
-          cmake -B build \
-            -DFAISS_ENABLE_GPU=OFF \
-            -DFAISS_ENABLE_PYTHON=OFF \
-            -DBUILD_TESTING=OFF \
-            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -Wno-unused-command-line-argument -I${LIBOMP_PREFIX}/include" \
-            -DOpenMP_CXX_LIB_NAMES="omp" \
-            -DOpenMP_omp_LIBRARY="${LIBOMP_PREFIX}/lib/libomp.dylib" \
-            -DOpenMP_C_FLAGS="-Xpreprocessor -fopenmp -Wno-unused-command-line-argument -I${LIBOMP_PREFIX}/include" \
-            -DOpenMP_C_LIB_NAMES="omp" \
-            -DOpenMP_gomp_LIBRARY="${LIBOMP_PREFIX}/lib/libomp.dylib"
-          cmake --build build -j$(sysctl -n hw.ncpu)
-          sudo cmake --install build
-          cd -
-      
-      - name: Install npm dependencies
-        run: npm ci
-      
-      - name: Build
-        run: npm run build
-      
-      - name: Test
-        run: npm run test:ci
-      
-      - name: Package
-        run: |
-          mkdir -p dist
-          tar -czf dist/faiss-node-macos-x64.tar.gz build/Release/faiss_node.node
-      
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-x64
-          path: dist/faiss-node-macos-x64.tar.gz
-
   build-linux-x64:
     name: Build Linux x64
     runs-on: ubuntu-latest
@@ -189,7 +128,7 @@ jobs:
 
   publish-npm:
     name: Publish to npm
-    needs: [build-macos-arm64, build-macos-x64, build-linux-x64]
+    needs: [build-macos-arm64, build-linux-x64]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -227,7 +166,7 @@ jobs:
 
   create-release:
     name: Create Release
-    needs: [build-macos-arm64, build-macos-x64, build-linux-x64]
+    needs: [build-macos-arm64, build-linux-x64]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:

@@ -9,6 +9,8 @@ on:
       - 'README.md'
   push:
     branches: [ main, develop ]
+    tags:
+      - 'v*'
     paths:
       - 'src/**'
       - 'typedoc.json'
