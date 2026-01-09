@@ -1,0 +1,13 @@
+{
+  "name": "test-faiss-node-native",
+  "version": "1.0.0",
+  "description": "Test script for @faiss-node/native package",
+  "type": "commonjs",
+  "main": "test.js",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "@faiss-node/native": "latest"
+  }
+}
