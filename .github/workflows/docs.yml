@@ -64,42 +64,36 @@ jobs:
           find ./docs -name "CNAME" -exec rm -f {} + || true
           echo "✅ CNAME files removed"
       
-      - name: Create combined documentation structure
+      - name: Prepare Pages content
         run: |
-          # Create a combined docs directory for deployment
-          mkdir -p docs/combined
-          # Copy TypeDoc API docs
-          cp -r docs/api/* docs/combined/ 2>/dev/null || true
-          # Create index page that links to both
-          cat > docs/combined/index.html << 'EOF'
+          # Use docs/api as the root of the GitHub Pages site
+          # and link to the generated Doxygen docs under /html
+          mkdir -p docs/api/html
+          # Ensure Doxygen HTML is available under /html
+          cp -r docs/html/* docs/api/html/ 2>/dev/null || true
+          # Create a simple index page that links to both sections
+          cat > docs/api/index.html << 'EOF'
           <!DOCTYPE html>
           <html>
           <head>
+            <meta charset="utf-8" />
             <title>@faiss-node/native Documentation</title>
-            <meta http-equiv="refresh" content="0; url=./index.html">
           </head>
           <body>
             <h1>@faiss-node/native Documentation</h1>
             <ul>
               <li><a href="./index.html">JavaScript/TypeScript API (TypeDoc)</a></li>
-              <li><a href="../html/index.html">C++ Native Code (Doxygen)</a></li>
+              <li><a href="./html/index.html">C++ Native Code (Doxygen)</a></li>
             </ul>
           </body>
           </html>
           EOF
-          echo "✅ Combined documentation structure created"
+          echo "✅ Pages content prepared under docs/api"
       
-      - name: Upload TypeDoc artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: './docs/api'
-          name: typedoc-docs
-      
-      - name: Upload Doxygen artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: './docs/html'
-          name: doxygen-docs
 
   deploy:
     name: Deploy to GitHub Pages
@@ -108,25 +102,8 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - name: Download TypeDoc artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: typedoc-docs
-          path: ./docs/api
-      
-      - name: Download Doxygen artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: doxygen-docs
-          path: ./docs/html
-      
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-      
       - name: Deploy to GitHub Pages
-        id: deployment
+        id: deploy
         uses: actions/deploy-pages@v4
-        with:
-          folder: './docs/api'
