@@ -69,7 +69,12 @@
             "-std=c++17",
             "-fexceptions",
             "-frtti",
-            "-fopenmp"
+            "-fopenmp",
+            "-I/usr/local/include"
+          ],
+          "include_dirs": [
+            "/usr/local/include",
+            "/usr/include"
           ]
         }]
       ],

@@ -112,15 +112,22 @@ jobs:
       - name: Build
         run: |
           echo "=== Verifying FAISS installation before build ==="
+          if [ ! -d /usr/local/include/faiss ]; then
+            echo "❌ ERROR: /usr/local/include/faiss directory not found!"
+            echo "Checking what was installed:"
+            ls -la /usr/local/include/ | head -10
+            exit 1
+          fi
           ls -la /usr/local/include/faiss/ | head -5
+          if [ ! -f /usr/local/include/faiss/impl/FaissAssert.h ]; then
+            echo "❌ ERROR: /usr/local/include/faiss/impl/FaissAssert.h not found!"
+            echo "Checking impl directory:"
+            ls -la /usr/local/include/faiss/impl/ | head -10 || echo "impl directory doesn't exist"
+            exit 1
+          fi
+          echo "✅ FAISS headers verified"
           ls -la /usr/local/lib/libfaiss* || echo "No libfaiss found"
-          echo "=== Setting environment variables for build ==="
-          export CPPFLAGS="-I/usr/local/include"
-          export CXXFLAGS="-I/usr/local/include"
-          export LDFLAGS="-L/usr/local/lib"
-          echo "CPPFLAGS: $CPPFLAGS"
-          echo "CXXFLAGS: $CXXFLAGS"
-          echo "LDFLAGS: $LDFLAGS"
+          echo "=== Building native module ==="
           npm run build
       
       - name: Test
