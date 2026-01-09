@@ -104,10 +104,15 @@ jobs:
             exit 1
           fi
           echo "✅ FAISS headers verified: /usr/local/include/faiss/impl/FaissAssert.h exists"
+          # Double-check installation
+          echo "=== Final FAISS installation check ==="
+          find /usr/local/include -name "FaissAssert.h" 2>/dev/null || echo "⚠️ FaissAssert.h not found in /usr/local/include"
+          ls -la /usr/local/include/faiss/ | head -10
+          ls -la /usr/local/lib/libfaiss* || echo "No libfaiss found"
           cd -
       
-      - name: Install npm dependencies
-        run: npm ci
+      - name: Install npm dependencies (skip build)
+        run: npm ci --ignore-scripts
       
       - name: Build
         run: |
@@ -123,11 +128,15 @@ jobs:
             echo "❌ ERROR: /usr/local/include/faiss/impl/FaissAssert.h not found!"
             echo "Checking impl directory:"
             ls -la /usr/local/include/faiss/impl/ | head -10 || echo "impl directory doesn't exist"
+            echo "Searching for FaissAssert.h:"
+            find /usr/local -name "FaissAssert.h" 2>/dev/null || echo "Not found anywhere"
             exit 1
           fi
           echo "✅ FAISS headers verified"
           ls -la /usr/local/lib/libfaiss* || echo "No libfaiss found"
           echo "=== Building native module ==="
+          echo "Testing include path:"
+          g++ -E -x c++ - -I/usr/local/include <<< '#include <faiss/impl/FaissAssert.h>' 2>&1 | head -5 || echo "Include test failed"
           npm run build
       
       - name: Test
