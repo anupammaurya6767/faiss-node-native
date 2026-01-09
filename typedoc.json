@@ -1,0 +1,30 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/js/index.js",
+    "src/js/types.d.ts"
+  ],
+  "out": "docs/api",
+  "theme": "default",
+  "name": "@faiss-node/native API Documentation",
+  "readme": "README.md",
+  "includeVersion": true,
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeExternals": true,
+  "excludeInternal": true,
+  "categorizeByGroup": true,
+  "categoryOrder": [
+    "Classes",
+    "Interfaces",
+    "Types"
+  ],
+  "gitRevision": "main",
+  "gitRemote": "origin",
+  "githubPages": true,
+  "validation": {
+    "invalidLink": true,
+    "notDocumented": false
+  },
+  "plugin": []
+}

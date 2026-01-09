@@ -6,7 +6,9 @@ on:
     paths:
       - 'src/**'
       - 'Doxyfile'
+      - 'typedoc.json'
       - 'README.md'
+      - 'API.md'
   workflow_dispatch:
 
 # Permissions for GitHub Pages
@@ -22,40 +24,80 @@ concurrency:
 
 jobs:
   build:
-    name: Build Documentation
+    name: Build All Documentation
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
       
       - name: Install Doxygen
         run: |
           sudo apt-get update
           sudo apt-get install -y doxygen graphviz
       
-      - name: Generate documentation
-        run: npm run docs
-      
-      - name: Setup Pages (clear any custom domain)
-        uses: actions/configure-pages@v4
-        # This will use default GitHub Pages domain (username.github.io/repo)
-        # If custom domain is set in repo settings, it needs to be manually cleared
-      
-      - name: Remove CNAME and ensure clean deployment
+      - name: Generate all documentation
         run: |
-          echo "=== Checking for CNAME files ==="
-          find docs/html -name "CNAME" -o -name "*.cname" | while read file; do
-            echo "Found and removing: $file"
-            rm -f "$file"
-          done
-          echo "✅ No CNAME files found or all removed"
-          echo "=== Listing files to be deployed ==="
-          ls -la docs/html/ | head -10
+          echo "=== Generating TypeDoc (JavaScript API) ==="
+          npm run docs:js
+          echo "=== Generating Doxygen (C++ Native) ==="
+          npm run docs:cpp
+          echo "=== Documentation generation complete ==="
+          ls -la docs/api/ | head -5
+          ls -la docs/html/ | head -5
       
-      - name: Upload artifact
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      
+      - name: Remove CNAME files
+        run: |
+          find ./docs -name "CNAME" -exec rm -f {} + || true
+          echo "✅ CNAME files removed"
+      
+      - name: Create combined documentation structure
+        run: |
+          # Create a combined docs directory for deployment
+          mkdir -p docs/combined
+          # Copy TypeDoc API docs
+          cp -r docs/api/* docs/combined/ 2>/dev/null || true
+          # Create index page that links to both
+          cat > docs/combined/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>@faiss-node/native Documentation</title>
+            <meta http-equiv="refresh" content="0; url=./index.html">
+          </head>
+          <body>
+            <h1>@faiss-node/native Documentation</h1>
+            <ul>
+              <li><a href="./index.html">JavaScript/TypeScript API (TypeDoc)</a></li>
+              <li><a href="../html/index.html">C++ Native Code (Doxygen)</a></li>
+            </ul>
+          </body>
+          </html>
+          EOF
+          echo "✅ Combined documentation structure created"
+      
+      - name: Upload TypeDoc artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './docs/api'
+          name: typedoc-docs
+      
+      - name: Upload Doxygen artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: './docs/html'
+          name: doxygen-docs
 
   deploy:
     name: Deploy to GitHub Pages
@@ -65,6 +107,23 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Download TypeDoc artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: typedoc-docs
+          path: ./docs/api
+      
+      - name: Download Doxygen artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: doxygen-docs
+          path: ./docs/html
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          folder: './docs/api'

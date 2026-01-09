@@ -1,5 +1,5 @@
 /**
- * Basic search example - Phase 1
+ * Basic search example
  */
 
 const { FaissIndex } = require('../src/js/index');

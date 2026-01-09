@@ -24,7 +24,7 @@ class FaissIndex {
     /**
      * Create a new FAISS index
      * @param {Object} config - Configuration object
-     * @param {string} config.type - Index type ('FLAT_L2' for Phase 1)
+     * @param {string} config.type - Index type ('FLAT_L2', 'IVF_FLAT', or 'HNSW')
      * @param {number} config.dims - Vector dimensions (required)
      */
     constructor(config) {
@@ -65,7 +65,7 @@ class FaissIndex {
     /**
      * Add vectors to the index
      * @param {Float32Array} vectors - Single vector or batch of vectors
-     * @param {Float32Array} [ids] - Optional IDs for vectors (not used in Phase 1)
+     * @param {Float32Array} [ids] - Optional IDs for vectors (reserved for future use)
      * @returns {Promise<void>}
      */
     async add(vectors, ids) {
@@ -83,7 +83,7 @@ class FaissIndex {
             );
         }
         
-        // Phase 2: Async operation using background worker
+        // Async operation using background worker
         try {
             await this._native.add(vectors);
         } catch (error) {
@@ -163,7 +163,7 @@ class FaissIndex {
             throw new TypeError('k must be a positive integer');
         }
         
-        // Phase 2: Async operation using background worker
+        // Async operation using background worker
         try {
             const results = await this._native.search(query, k);
             return {

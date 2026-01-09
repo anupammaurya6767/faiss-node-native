@@ -1,0 +1,54 @@
+name: Auto-Generate Documentation
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'typedoc.json'
+      - 'Doxyfile'
+      - 'README.md'
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/**'
+      - 'typedoc.json'
+      - 'Doxyfile'
+
+jobs:
+  check-docs:
+    name: Verify Documentation Generation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install Doxygen
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+      
+      - name: Generate documentation
+        run: npm run docs
+      
+      - name: Check documentation files
+        run: |
+          echo "=== Checking TypeDoc output ==="
+          test -d docs/api && echo "✅ TypeDoc docs generated" || (echo "❌ TypeDoc docs missing" && exit 1)
+          test -f docs/api/index.html && echo "✅ TypeDoc index.html exists" || (echo "❌ TypeDoc index.html missing" && exit 1)
+          
+          echo ""
+          echo "=== Checking Doxygen output ==="
+          test -d docs/html && echo "✅ Doxygen docs generated" || (echo "❌ Doxygen docs missing" && exit 1)
+          test -f docs/html/index.html && echo "✅ Doxygen index.html exists" || (echo "❌ Doxygen index.html missing" && exit 1)
+          
+          echo ""
+          echo "✅ All documentation generated successfully!"

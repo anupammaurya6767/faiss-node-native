@@ -70,7 +70,7 @@ jobs:
 
   build-macos-x64:
     name: Build macOS x64
-    runs-on: macos-12  # x64 runner
+    runs-on: macos-13  # x64 runner (macos-12 deprecated)
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

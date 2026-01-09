@@ -1,6 +1,6 @@
 {
   "name": "@faiss-node/native",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "High-performance Node.js native bindings for Facebook FAISS - the fastest vector similarity search library. Supports FLAT_L2, IVF_FLAT, and HNSW index types with async operations, persistence, and batch search.",
   "main": "src/js/index.js",
   "types": "src/js/types.d.ts",
@@ -44,8 +44,14 @@
     "test:memory": "node --expose-gc test/memory.test.js",
     "test:local": "npm run clean && npm run build && npm test",
     "ci:status": "bash scripts/check-ci-status.sh",
-    "docs": "doxygen Doxyfile",
-    "docs:serve": "cd docs/html && python3 -m http.server 8000",
+    "docs": "npm run docs:js && npm run docs:cpp",
+    "docs:js": "typedoc",
+    "docs:cpp": "doxygen Doxyfile",
+    "docs:watch": "npm run docs:js -- --watch",
+    "docs:serve": "cd docs/api && python3 -m http.server 8000",
+    "docs:serve:cpp": "cd docs/html && python3 -m http.server 8001",
+    "docs:auto": "npm run docs && npm run docs:serve",
+    "prepublishOnly": "npm run docs",
     "publish:local": "bash -c 'export NODE_AUTH_TOKEN=$(grep NPM_TOKEN .env | cut -d \\\"=\\\" -f2) && npm config set //registry.npmjs.org/:_authToken $NODE_AUTH_TOKEN && npm publish --access public'",
     "publish:dry-run": "bash -c 'export NODE_AUTH_TOKEN=$(grep NPM_TOKEN .env | cut -d \\\"=\\\" -f2) && npm config set //registry.npmjs.org/:_authToken $NODE_AUTH_TOKEN && npm publish --access public --dry-run'"
   },
@@ -54,7 +60,8 @@
   },
   "devDependencies": {
     "express": "^4.22.1",
-    "jest": "^29.7.0"
+    "jest": "^29.7.0",
+    "typedoc": "^0.25.0"
   },
   "dependencies": {
     "node-addon-api": "^7.0.0"
