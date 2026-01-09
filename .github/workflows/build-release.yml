@@ -110,7 +110,18 @@ jobs:
         run: npm ci
       
       - name: Build
-        run: npm run build
+        run: |
+          echo "=== Verifying FAISS installation before build ==="
+          ls -la /usr/local/include/faiss/ | head -5
+          ls -la /usr/local/lib/libfaiss* || echo "No libfaiss found"
+          echo "=== Setting environment variables for build ==="
+          export CPPFLAGS="-I/usr/local/include"
+          export CXXFLAGS="-I/usr/local/include"
+          export LDFLAGS="-L/usr/local/lib"
+          echo "CPPFLAGS: $CPPFLAGS"
+          echo "CXXFLAGS: $CXXFLAGS"
+          echo "LDFLAGS: $LDFLAGS"
+          npm run build
       
       - name: Test
         run: npm run test:ci
