@@ -53,6 +53,12 @@
           ]
         }],
         ["OS=='linux'", {
+          "include_dirs": [
+            "<!@(node -p \"require('node-addon-api').include\")",
+            "src/cpp",
+            "/usr/local/include",
+            "/usr/include"
+          ],
           "libraries": [
             "-L/usr/local/lib",
             "-L/usr/lib",
@@ -71,10 +77,6 @@
             "-frtti",
             "-fopenmp",
             "-I/usr/local/include"
-          ],
-          "include_dirs": [
-            "/usr/local/include",
-            "/usr/include"
           ]
         }]
       ],
