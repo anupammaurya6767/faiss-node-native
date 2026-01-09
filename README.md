@@ -14,9 +14,7 @@ High-performance Node.js native bindings for [Facebook FAISS](https://github.com
 - 📦 **Multiple Index Types** - FLAT_L2, IVF_FLAT, and HNSW with optimized defaults
 - 💾 **Persistence** - Save/load indexes to disk or serialize to buffers
 - ⚡ **High Performance** - Direct C++ bindings with zero-copy data transfer
-- 🧪 **Well-Tested** - 1000+ comprehensive tests covering edge cases
 - 📚 **TypeScript Support** - Full type definitions included
-- 🔧 **Production-Ready** - Memory-safe, error-handled, and battle-tested
 
 ## Installation
 
@@ -481,19 +479,6 @@ npm run docs:serve    # Serve docs locally at http://localhost:8000
 - **API Documentation**: [GitHub Pages](https://anupammaurya6767.github.io/faiss-node-native/)
 - **Examples**: See `examples/` directory
 - **Contributing**: See [CONTRIBUTING.md](./CONTRIBUTING.md)
-
-## Comparison with Other Packages
-
-### vs. `faiss-node` (ewfian)
-
-| Feature | @faiss-node/native | faiss-node |
-|---------|-------------------|------------|
-| Async Operations | ✅ Promise-based | ❌ Synchronous (blocks event loop) |
-| Thread Safety | ✅ Mutex-protected | ❌ Not thread-safe |
-| API Design | ✅ High-level wrapper | ⚠️ Low-level FAISS classes |
-| TypeScript | ✅ Full support | ⚠️ Partial |
-| Testing | ✅ 1000+ tests | ⚠️ Minimal |
-| Production Ready | ✅ Yes | ⚠️ Early stage |
 
 ## Troubleshooting
 
