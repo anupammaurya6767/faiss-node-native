@@ -548,3 +548,4 @@ MIT License - see [LICENSE](./LICENSE) file for details.
 ---
 
 Made with ❤️ for the Node.js community
+
