@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://anupammaurya6767.github.io/faiss-node-native/)
 
-High-performance Node.js native bindings for [Facebook FAISS](https://github.com/facebookresearch/faiss) - the industry-standard vector similarity search library. Built for production-ready semantic search, RAG applications, and vector databases.
+High-performance Node.js native bindings for [Facebook FAISS](https://github.com/facebookresearch/faiss) - the industry-standard vector similarity search library. Built for semantic search, RAG applications, and vector databases.
 
 ## Features
 
