@@ -160,7 +160,13 @@ jobs:
       
       - name: Update package.json version
         run: |
-          npm version ${{ steps.version.outputs.VERSION }} --no-git-tag-version
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          TARGET_VERSION="${{ steps.version.outputs.VERSION }}"
+          if [ "$CURRENT_VERSION" != "$TARGET_VERSION" ]; then
+            npm version $TARGET_VERSION --no-git-tag-version
+          else
+            echo "✅ Version already matches: $CURRENT_VERSION"
+          fi
       
       - name: Install dependencies
         run: npm ci
@@ -180,6 +186,8 @@ jobs:
     needs: [build-macos-arm64, build-linux-x64]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -203,5 +211,6 @@ jobs:
             dist/**/*.tar.gz
           tag_name: v${{ steps.version.outputs.VERSION }}
           name: Release v${{ steps.version.outputs.VERSION }}
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
