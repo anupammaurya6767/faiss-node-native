@@ -1,9 +1,9 @@
 {
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": [
-    "src/js/index.js",
-    "src/js/types.d.ts"
+    "src/js/index.js"
   ],
+  "entryPointStrategy": "expand",
   "out": "docs/api",
   "theme": "default",
   "name": "@faiss-node/native API Documentation",
