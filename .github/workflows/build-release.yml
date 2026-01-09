@@ -152,6 +152,12 @@ jobs:
           echo "=== Building native module ==="
           echo "Testing include path:"
           g++ -E -x c++ - -I/usr/local/include <<< '#include <faiss/impl/FaissAssert.h>' 2>&1 | head -5 || echo "Include test failed"
+          echo "=== Checking binding.gyp ==="
+          cat binding.gyp | grep -A 5 "OS=='linux'"
+          echo "=== Building with explicit include path ==="
+          export CPPFLAGS="-I/usr/local/include"
+          export CXXFLAGS="-I/usr/local/include"
+          export LDFLAGS="-L/usr/local/lib"
           npm run build
       
       - name: Test
