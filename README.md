@@ -39,12 +39,21 @@ sudo apt-get install -y cmake libopenblas-dev libomp-dev
 ```
 
 **Windows:**
-Windows users have several options:
-- **WSL2 (Recommended)**: Use Windows Subsystem for Linux 2 - see [WINDOWS.md](WINDOWS.md#option-1-wsl2-setup-recommended)
-- **VS Code Dev Container**: Use the included `.devcontainer` configuration - see [WINDOWS.md](WINDOWS.md#option-2-vs-code-dev-container)
-- **Docker Desktop**: Run the project in a container - see [WINDOWS.md](WINDOWS.md#option-3-docker-desktop-manual)
+Windows native builds require FAISS to be installed, which can be complex. We recommend using one of these approaches:
 
-For detailed Windows setup instructions, see [WINDOWS.md](WINDOWS.md).
+1. **WSL2 (Recommended)**: Use Windows Subsystem for Linux 2 - see [WINDOWS.md](WINDOWS.md#option-1-wsl2-setup-recommended)
+   - After installing WSL2, follow the Linux instructions above
+   - Works seamlessly from Windows Terminal and VS Code
+
+2. **VS Code Dev Container**: Use the included `.devcontainer` configuration - see [WINDOWS.md](WINDOWS.md#option-2-vs-code-dev-container)
+   - Best for teams and consistent development environments
+   - No manual setup required - just "Reopen in Container"
+
+3. **Docker Desktop**: Run the project in a container - see [WINDOWS.md](WINDOWS.md#option-3-docker-desktop-manual)
+   - Full control over the container environment
+   - Works with any IDE or editor
+
+**Note for npm users:** The npm package (`@faiss-node/native`) works on Windows when installed in WSL2, Dev Containers, or Docker. For Windows native development, see [WINDOWS.md](WINDOWS.md) for detailed setup instructions.
 
 **Building FAISS from Source (Linux/WSL2):**
 ```bash

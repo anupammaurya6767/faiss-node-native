@@ -188,44 +188,33 @@ jobs:
           node-version: 20
           cache: 'npm'
       
-      - name: Setup vcpkg
-        uses: microsoft/setup-vcpkg@v3
-        with:
-          vcpkgGitCommitSha: 'HEAD'
-      
-      - name: Install dependencies with vcpkg
+      - name: Check for FAISS installation (Windows) - Early Check
+        id: check_faiss_early
+        continue-on-error: true
         run: |
-          vcpkg install openblas:x64-windows --triplet x64-windows
-          # Note: FAISS is not available in vcpkg, so we need to build from source
-          # This is complex on Windows, so WSL2/Docker is recommended
+          echo "Checking for FAISS installation on Windows..."
+          if (Test-Path "C:\faiss-install\include\faiss") {
+            echo "FAISS_FOUND=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            echo "✅ FAISS found at C:\faiss-install"
+          } else {
+            echo "FAISS_FOUND=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            echo "⚠️ FAISS not found - will skip Windows native build"
+          }
+        shell: pwsh
       
-      - name: Build FAISS from source (Windows)
-        id: build_faiss
+      - name: Skip Windows build (FAISS not installed)
+        if: steps.check_faiss_early.outputs.FAISS_FOUND != 'true'
         run: |
           echo "⚠️ Windows native builds are complex. WSL2/Docker is recommended."
+          echo "FAISS is not installed in CI environment (this is expected)."
           echo "See WINDOWS.md for setup instructions."
-          echo "Skipping Windows native FAISS build - users should use WSL2/Docker."
-          echo "FAISS_INSTALLED=false" >> $GITHUB_OUTPUT
+          echo "✅ Skipping Windows native build (not an error)"
           exit 0
         continue-on-error: true
-        shell: bash
-      
-      - name: Check if FAISS is installed (Windows)
-        id: check_faiss
-        run: |
-          echo "Checking for FAISS installation..."
-          if [ -d "C:/faiss-install/include/faiss" ] || [ -d "C:/faiss/include" ] || [ -d "C:/Program Files/faiss/include/faiss" ]; then
-            echo "FAISS_FOUND=true" >> $GITHUB_OUTPUT
-            echo "✅ FAISS headers found"
-          else
-            echo "FAISS_FOUND=false" >> $GITHUB_OUTPUT
-            echo "⚠️ FAISS headers not found - skipping Windows native build"
-          fi
-        continue-on-error: true
-        shell: bash
+        shell: pwsh
       
       - name: Install npm dependencies (Windows - skip build if no FAISS)
-        if: steps.check_faiss.outputs.FAISS_FOUND != 'true'
+        if: steps.check_faiss_early.outputs.FAISS_FOUND != 'true'
         continue-on-error: true
         run: |
           echo "⚠️ FAISS not installed - temporarily removing binding.gyp to prevent build"
@@ -251,7 +240,7 @@ jobs:
         shell: bash
       
       - name: Install npm dependencies (Windows - with FAISS)
-        if: steps.check_faiss.outputs.FAISS_FOUND == 'true'
+        if: steps.check_faiss_early.outputs.FAISS_FOUND == 'true'
         continue-on-error: true
         run: |
           echo "Installing npm dependencies (FAISS is installed, will build later)..."
@@ -260,7 +249,7 @@ jobs:
         shell: bash
       
       - name: Build (Windows - if FAISS installed)
-        if: steps.check_faiss.outputs.FAISS_FOUND == 'true'
+        if: steps.check_faiss_early.outputs.FAISS_FOUND == 'true'
         run: |
           echo "Building with FAISS found at C:/faiss-install"
           $env:INCLUDE = "C:\faiss-install\include;$env:INCLUDE"
@@ -269,32 +258,23 @@ jobs:
           npm run build
         continue-on-error: true
         shell: pwsh
-        env:
-          VCPKG_ROOT: ${{ env.VCPKG_ROOT }}
-      
-      - name: Skip Build (Windows - FAISS not installed)
-        if: steps.check_faiss.outputs.FAISS_FOUND != 'true'
-        run: |
-          echo "⚠️ Windows native builds require FAISS to be installed."
-          echo "FAISS is not installed, so skipping build."
-          echo "Windows users should use WSL2, VS Code Dev Container, or Docker Desktop."
-          echo "See WINDOWS.md for detailed setup instructions."
-          echo "✅ Skipping Windows native build (not an error)"
-          exit 0
-        continue-on-error: true
-        shell: bash
       
       - name: Test (Windows)
-        if: steps.check_faiss.outputs.FAISS_FOUND == 'true' && success()
+        if: steps.check_faiss_early.outputs.FAISS_FOUND == 'true' && success()
         run: npm run test:ci
         continue-on-error: true
       
       - name: Package (Windows)
-        if: steps.check_faiss.outputs.FAISS_FOUND == 'true' && success()
+        if: steps.check_faiss_early.outputs.FAISS_FOUND == 'true' && success()
         run: |
           if (Test-Path "build\Release\faiss_node.node") {
             New-Item -ItemType Directory -Force -Path dist | Out-Null
+            # Create tar.gz for consistency with other platforms
+            # PowerShell doesn't have native tar, so use 7zip or create zip then convert
+            # For now, create zip (will be included in release)
             Compress-Archive -Path build\Release\faiss_node.node -DestinationPath dist\faiss-node-windows-x64.zip -Force
+            # Also create a marker file to indicate Windows build succeeded
+            echo "Windows x64 build succeeded" | Out-File -FilePath dist\windows-x64-success.txt -Encoding utf8
             echo "✅ Windows binary packaged"
           } else {
             echo "⚠️ Windows binary not found"
@@ -302,19 +282,45 @@ jobs:
         continue-on-error: true
         shell: pwsh
       
-      - name: Upload artifact
-        if: success()
+      - name: Upload artifact (Windows - if built)
+        if: steps.check_faiss_early.outputs.FAISS_FOUND == 'true' && success()
         uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: dist/faiss-node-windows-x64.tar.gz
+          path: |
+            dist/faiss-node-windows-x64.zip
+            dist/windows-x64-success.txt
+          if-no-files-found: ignore
+        continue-on-error: true
+      
+      - name: Create empty artifact marker (Windows - skipped)
+        if: steps.check_faiss_early.outputs.FAISS_FOUND != 'true'
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          echo "Windows build skipped - FAISS not installed in CI" | Out-File -FilePath dist\windows-x64-skipped.txt -Encoding utf8
+        continue-on-error: true
+        shell: pwsh
+      
+      - name: Upload skipped marker (Windows)
+        if: steps.check_faiss_early.outputs.FAISS_FOUND != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: dist/windows-x64-skipped.txt
+          if-no-files-found: ignore
         continue-on-error: true
 
   publish-npm:
     name: Publish to npm
-    needs: [build-macos-arm64, build-linux-x64]
+    needs: [build-macos-arm64, build-linux-x64, build-windows-x64]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: |
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.build-macos-arm64.result == 'success' &&
+      needs.build-linux-x64.result == 'success'
+    # Note: Windows build may be skipped/failed (FAISS not installed in CI), which is OK
+    # npm package doesn't include prebuilt binaries - users build from source
+    # We publish as long as macOS and Linux builds succeed (Windows is optional)
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -370,8 +376,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist
-          pattern: '**/*.tar.gz'
+          pattern: |
+            **/*.tar.gz
+            **/*.zip
           if-no-files-found: warn
+          merge-multiple: true
       
       - name: Get version
         id: version
@@ -382,8 +391,16 @@ jobs:
       - name: List artifacts
         run: |
           echo "=== Artifacts found ==="
-          find dist -type f -name "*.tar.gz" 2>/dev/null || echo "No artifacts found"
+          find dist -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.txt" \) 2>/dev/null || echo "No artifacts found"
           ls -la dist/ 2>/dev/null || echo "dist directory not found"
+          echo ""
+          echo "=== Platform artifacts ==="
+          echo "macOS arm64:"
+          ls -la dist/macos-arm64/ 2>/dev/null || echo "  Not found"
+          echo "Linux x64:"
+          ls -la dist/linux-x64/ 2>/dev/null || echo "  Not found"
+          echo "Windows x64:"
+          ls -la dist/windows-x64/ 2>/dev/null || echo "  Not found (skipped - expected if FAISS not installed)"
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -391,9 +408,24 @@ jobs:
           draft: false
           files: |
             dist/**/*.tar.gz
+            dist/**/*.zip
           tag_name: v${{ steps.version.outputs.VERSION }}
           name: Release v${{ steps.version.outputs.VERSION }}
           generate_release_notes: true
           fail_on_unmatched_files: false
+          body: |
+            ## Pre-built Binaries
+            
+            This release includes pre-built binaries for:
+            - ✅ macOS arm64
+            - ✅ Linux x64
+            - ⚠️ Windows x64 (may be skipped if FAISS not installed in CI)
+            
+            **Note for Windows users:** If Windows binaries are not available, you can:
+            - Use WSL2 (recommended) - see [WINDOWS.md](WINDOWS.md)
+            - Use VS Code Dev Container - see [WINDOWS.md](WINDOWS.md)
+            - Use Docker Desktop - see [WINDOWS.md](WINDOWS.md)
+            
+            See [WINDOWS.md](WINDOWS.md) for detailed Windows setup instructions.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
