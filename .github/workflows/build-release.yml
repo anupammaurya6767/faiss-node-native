@@ -174,6 +174,93 @@ jobs:
           name: linux-x64
           path: dist/faiss-node-linux-x64.tar.gz
 
+  build-windows-x64:
+    name: Build Windows x64
+    runs-on: windows-latest
+    continue-on-error: true  # Windows builds are optional, WSL2/Docker recommended
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      
+      - name: Setup vcpkg
+        uses: microsoft/setup-vcpkg@v3
+        with:
+          vcpkgGitCommitSha: 'HEAD'
+      
+      - name: Install dependencies with vcpkg
+        run: |
+          vcpkg install openblas:x64-windows --triplet x64-windows
+          # Note: FAISS is not available in vcpkg, so we need to build from source
+          # This is complex on Windows, so WSL2/Docker is recommended
+      
+      - name: Build FAISS from source (Windows)
+        run: |
+          # Install CMake and Visual Studio Build Tools
+          choco install cmake --version=3.27.0 -y || echo "Chocolatey not available, using built-in CMake"
+          # Clone and build FAISS
+          git clone https://github.com/facebookresearch/faiss.git C:\faiss
+          cd C:\faiss
+          mkdir build
+          cd build
+          cmake -G "Visual Studio 17 2022" -A x64 ^
+            -DFAISS_ENABLE_GPU=OFF ^
+            -DFAISS_ENABLE_PYTHON=OFF ^
+            -DBUILD_TESTING=OFF ^
+            -DCMAKE_BUILD_TYPE=Release ^
+            -DCMAKE_INSTALL_PREFIX=C:\faiss-install ^
+            -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake"
+          cmake --build . --config Release -j
+          cmake --install . --config Release
+          cd -
+        continue-on-error: true
+        shell: cmd
+      
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts
+        continue-on-error: true
+      
+      - name: Build (Windows)
+        run: |
+          echo "Windows native builds are complex. WSL2/Docker is recommended."
+          echo "See WINDOWS.md for setup instructions."
+          # Attempt build with node-gyp
+          set INCLUDE=C:\faiss-install\include;%INCLUDE%
+          set LIB=C:\faiss-install\lib;%LIB%
+          set PATH=C:\faiss-install\bin;%PATH%
+          npm run build
+        continue-on-error: true
+        shell: cmd
+        env:
+          VCPKG_ROOT: ${{ env.VCPKG_ROOT }}
+      
+      - name: Test (Windows)
+        run: npm run test:ci
+        continue-on-error: true
+      
+      - name: Package (Windows)
+        if: success()
+        run: |
+          if exist build\Release\faiss_node.node (
+            mkdir dist
+            tar -czf dist\faiss-node-windows-x64.tar.gz build\Release\faiss_node.node
+          )
+        continue-on-error: true
+        shell: cmd
+      
+      - name: Upload artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: dist/faiss-node-windows-x64.tar.gz
+        continue-on-error: true
+
   publish-npm:
     name: Publish to npm
     needs: [build-macos-arm64, build-linux-x64]
@@ -221,7 +308,7 @@ jobs:
 
   create-release:
     name: Create Release
-    needs: [build-macos-arm64, build-linux-x64]
+    needs: [build-macos-arm64, build-linux-x64, build-windows-x64]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
@@ -234,12 +321,20 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist
+          pattern: '**/*.tar.gz'
+          if-no-files-found: warn
       
       - name: Get version
         id: version
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: List artifacts
+        run: |
+          echo "=== Artifacts found ==="
+          find dist -type f -name "*.tar.gz" 2>/dev/null || echo "No artifacts found"
+          ls -la dist/ 2>/dev/null || echo "dist directory not found"
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -250,5 +345,6 @@ jobs:
           tag_name: v${{ steps.version.outputs.VERSION }}
           name: Release v${{ steps.version.outputs.VERSION }}
           generate_release_notes: true
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

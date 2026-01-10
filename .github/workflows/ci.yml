@@ -17,8 +17,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest]
+        os: [macos-latest, ubuntu-latest, windows-latest]
         node-version: [18, 20, 22]
+        exclude:
+          # Windows builds are optional - only test on Node 20
+          - os: windows-latest
+            node-version: 18
+          - os: windows-latest
+            node-version: 22
     
     steps:
       - name: Checkout code
@@ -29,6 +35,37 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
+      
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake libopenblas-dev libomp-dev build-essential
+          # Build FAISS from source
+          git clone https://github.com/facebookresearch/faiss.git /tmp/faiss
+          cd /tmp/faiss
+          cmake -B build \
+            -DFAISS_ENABLE_GPU=OFF \
+            -DFAISS_ENABLE_PYTHON=OFF \
+            -DBUILD_TESTING=OFF \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DCMAKE_CXX_FLAGS="-fopenmp" \
+            -DCMAKE_C_FLAGS="-fopenmp"
+          cmake --build build -j$(nproc)
+          sudo cmake --install build
+          sudo ldconfig
+          cd -
+      
+      - name: Install dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        continue-on-error: true
+        run: |
+          echo "Windows native builds are complex. WSL2/Docker is recommended."
+          echo "See WINDOWS.md for setup instructions."
+          # For Windows, we skip native build in CI - users should use WSL2/Docker
+          echo "Skipping Windows native build in CI. Use WSL2 or Docker for Windows development."
+          exit 0
+        shell: bash
       
       - name: Install dependencies (macOS)
         if: matrix.os == 'macos-latest'
@@ -98,9 +135,22 @@ jobs:
           echo "=== Checking what faiss_node.node linked against ==="
           otool -L build/Release/faiss_node.node | head -10
       
-      - name: Build native module (non-macOS)
-        if: matrix.os != 'macos-latest'
-        run: npm run build
+      - name: Build native module (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          export CPPFLAGS="-I/usr/local/include"
+          export CXXFLAGS="-I/usr/local/include"
+          export LDFLAGS="-L/usr/local/lib"
+          npm run build
+      
+      - name: Build native module (Windows)
+        if: matrix.os == 'windows-latest'
+        continue-on-error: true
+        run: |
+          echo "Windows native builds are skipped in CI. Use WSL2 or Docker."
+          echo "See WINDOWS.md for setup instructions."
+          exit 0
+        shell: bash
       
       - name: Copy libraries to /usr/local/lib (macOS)
         if: matrix.os == 'macos-latest'
@@ -335,12 +385,31 @@ jobs:
           OMP_NUM_THREADS: 1
           OMP_THREAD_LIMIT: 1
       
-      - name: Run unit tests (non-macOS)
-        if: matrix.os != 'macos-latest'
+      - name: Run unit tests (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: npm run test:ci
       
+      - name: Run unit tests (Windows)
+        if: matrix.os == 'windows-latest'
+        continue-on-error: true
+        run: |
+          echo "Windows native tests are skipped in CI. Use WSL2 or Docker."
+          echo "See WINDOWS.md for setup instructions."
+          exit 0
+        shell: bash
+      
       - name: Run integration tests
+        if: matrix.os != 'windows-latest'
         run: npm run test:integration
+      
+      - name: Windows note (skip integration tests)
+        if: matrix.os == 'windows-latest'
+        continue-on-error: true
+        run: |
+          echo "Windows native tests are skipped in CI. Use WSL2 or Docker."
+          echo "See WINDOWS.md for setup instructions."
+          exit 0
+        shell: bash
 
   lint:
     name: Lint

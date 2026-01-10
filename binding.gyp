@@ -78,6 +78,40 @@
             "-fopenmp",
             "-I/usr/local/include"
           ]
+        }],
+        ["OS=='win'", {
+          "msvs_settings": {
+            "VCCLCompilerTool": {
+              "ExceptionHandling": 1,
+              "AdditionalOptions": [
+                "/std:c++17",
+                "/EHsc"
+              ]
+            }
+          },
+          "msvs_precompiled_header": "",
+          "include_dirs": [
+            "<!@(node -p \"require('node-addon-api').include\")",
+            "src/cpp",
+            "C:/faiss-install/include"
+          ],
+          "libraries": [
+            "faiss.lib",
+            "openblas.lib",
+            "libomp.lib"
+          ],
+          "library_dirs": [
+            "C:/faiss-install/lib"
+          ],
+          "cflags_cc": [
+            "/std:c++17",
+            "/EHsc"
+          ],
+          "conditions": [
+            ["target_arch=='x64'", {
+              "msvs_configuration_platform": "x64"
+            }]
+          ]
         }]
       ],
       "cflags_cc": [
