@@ -38,7 +38,15 @@ sudo apt-get install -y cmake libopenblas-dev libomp-dev
 # Build FAISS from source (see below)
 ```
 
-**Building FAISS from Source (Linux):**
+**Windows:**
+Windows users have several options:
+- **WSL2 (Recommended)**: Use Windows Subsystem for Linux 2 - see [WINDOWS.md](WINDOWS.md#option-1-wsl2-setup-recommended)
+- **VS Code Dev Container**: Use the included `.devcontainer` configuration - see [WINDOWS.md](WINDOWS.md#option-2-vs-code-dev-container)
+- **Docker Desktop**: Run the project in a container - see [WINDOWS.md](WINDOWS.md#option-3-docker-desktop-manual)
+
+For detailed Windows setup instructions, see [WINDOWS.md](WINDOWS.md).
+
+**Building FAISS from Source (Linux/WSL2):**
 ```bash
 git clone https://github.com/facebookresearch/faiss.git
 cd faiss
@@ -443,6 +451,7 @@ npm install @faiss-node/native@0.1.2
 
 ### Building from Source
 
+**macOS/Linux:**
 ```bash
 # Clone repository
 git clone https://github.com/anupammaurya6767/faiss-node-native.git
@@ -456,6 +465,16 @@ npm run build
 
 # Run tests
 npm test
+```
+
+**Windows:**
+Windows users should use WSL2 or VS Code Dev Container. See [WINDOWS.md](WINDOWS.md) for detailed setup instructions.
+
+**VS Code Dev Container (All Platforms):**
+```bash
+# Open in VS Code and select "Reopen in Container"
+# Or from command palette: "Dev Containers: Reopen in Container"
+# First build will take 5-10 minutes (compiles FAISS)
 ```
 
 ### Running Tests
@@ -497,7 +516,14 @@ ls /usr/local/lib/libfaiss*
 ```bash
 # Build and install FAISS from source (see Prerequisites)
 # Ensure CMAKE_INSTALL_PREFIX=/usr/local
+# Run ldconfig after installation
+sudo ldconfig
 ```
+
+**Windows: Build errors or missing dependencies**
+- Use WSL2 instead of native Windows - see [WINDOWS.md](WINDOWS.md#option-1-wsl2-setup-recommended)
+- Or use VS Code Dev Container - see [WINDOWS.md](WINDOWS.md#option-2-vs-code-dev-container)
+- Ensure Docker Desktop uses WSL2 backend if using containers
 
 ### Runtime Errors
 
