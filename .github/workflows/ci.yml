@@ -54,11 +54,26 @@ jobs:
           sudo ldconfig
           cd -
       
+      - name: Check FAISS installation (Windows) - Early Check
+        if: matrix.os == 'windows-latest'
+        id: check_faiss_early
+        continue-on-error: true
+        run: |
+          echo "Checking for FAISS installation on Windows..."
+          if [ -d "C:/faiss-install/include/faiss" ] || [ -d "C:/faiss/include" ] || [ -d "C:/Program Files/faiss/include/faiss" ]; then
+            echo "FAISS_FOUND=true" >> $GITHUB_OUTPUT
+            echo "✅ FAISS found"
+          else
+            echo "FAISS_FOUND=false" >> $GITHUB_OUTPUT
+            echo "⚠️ FAISS not found - will skip Windows native build"
+          fi
+        shell: bash
+      
       - name: Install dependencies (Windows)
         if: matrix.os == 'windows-latest'
         continue-on-error: true
         run: |
-          echo "Windows native builds are complex. WSL2/Docker is recommended."
+          echo "⚠️ Windows native builds are complex. WSL2/Docker is recommended."
           echo "See WINDOWS.md for setup instructions."
           # For Windows, we skip native build in CI - users should use WSL2/Docker
           echo "Skipping Windows native build in CI. Use WSL2 or Docker for Windows development."
@@ -111,8 +126,44 @@ jobs:
           ls -la /usr/local/include/faiss/ | head -5 || echo "No FAISS headers found"
           cd -
       
-      - name: Install npm dependencies
+      - name: Install npm dependencies (macOS/Linux)
+        if: matrix.os != 'windows-latest'
         run: npm ci
+      
+      - name: Install npm dependencies (Windows - skip build)
+        if: matrix.os == 'windows-latest'
+        continue-on-error: true
+        run: |
+          echo "Installing npm dependencies on Windows..."
+          echo "FAISS status: ${{ steps.check_faiss_early.outputs.FAISS_FOUND }}"
+          
+          # Temporarily rename binding.gyp to prevent automatic node-gyp detection by npm
+          # npm may try to rebuild even with --ignore-scripts if it detects binding.gyp
+          if [ "${{ steps.check_faiss_early.outputs.FAISS_FOUND }}" != "true" ]; then
+            echo "⚠️ FAISS not installed - temporarily renaming binding.gyp to prevent automatic build"
+            if [ -f "binding.gyp" ]; then
+              cp binding.gyp binding.gyp.bak
+              rm binding.gyp
+              echo "✅ binding.gyp removed temporarily to prevent automatic node-gyp build"
+            fi
+          fi
+          
+          # Install with --ignore-scripts to prevent lifecycle scripts
+          # Even with --ignore-scripts, npm may try to rebuild if binding.gyp exists
+          echo "Running npm ci --ignore-scripts..."
+          npm ci --ignore-scripts || {
+            echo "⚠️ npm ci had issues, but continuing (expected on Windows without FAISS)"
+            exit 0
+          }
+          
+          # Restore binding.gyp if we renamed it (for future steps that might need it)
+          if [ -f "binding.gyp.bak" ]; then
+            mv binding.gyp.bak binding.gyp
+            echo "✅ binding.gyp restored"
+          fi
+          
+          echo "✅ npm dependencies installed (build skipped)"
+        shell: bash
       
       - name: Build native module
         if: matrix.os == 'macos-latest'
@@ -141,36 +192,23 @@ jobs:
           export LDFLAGS="-L/usr/local/lib"
           npm run build
       
-      - name: Check FAISS installation (Windows)
-        if: matrix.os == 'windows-latest'
-        id: check_faiss_ci
-        continue-on-error: true
-        run: |
-          if [ -d "C:/faiss-install/include/faiss" ] || [ -d "C:/faiss/include" ] || [ -d "/usr/include/faiss" ]; then
-            echo "FAISS_FOUND=true" >> $GITHUB_OUTPUT
-            echo "✅ FAISS found"
-          else
-            echo "FAISS_FOUND=false" >> $GITHUB_OUTPUT
-            echo "⚠️ FAISS not found - skipping Windows native build"
-          fi
-        shell: bash
-      
-      - name: Build native module (Windows)
-        if: matrix.os == 'windows-latest' && steps.check_faiss_ci.outputs.FAISS_FOUND == 'true'
+      - name: Build native module (Windows - if FAISS installed)
+        if: matrix.os == 'windows-latest' && steps.check_faiss_early.outputs.FAISS_FOUND == 'true'
         continue-on-error: true
         run: |
           echo "Building Windows native module with FAISS..."
           $env:INCLUDE = "C:\faiss-install\include;$env:INCLUDE"
           $env:LIB = "C:\faiss-install\lib;$env:LIB"
+          $env:PATH = "C:\faiss-install\bin;$env:PATH"
           npm run build
         shell: pwsh
       
       - name: Skip Build (Windows - FAISS not installed)
-        if: matrix.os == 'windows-latest' && steps.check_faiss_ci.outputs.FAISS_FOUND != 'true'
+        if: matrix.os == 'windows-latest' && steps.check_faiss_early.outputs.FAISS_FOUND != 'true'
         continue-on-error: true
         run: |
           echo "⚠️ Windows native builds require FAISS installation."
-          echo "FAISS is not installed in this CI environment."
+          echo "FAISS is not installed in this CI environment (this is expected)."
           echo "Windows users should use WSL2, VS Code Dev Container, or Docker Desktop."
           echo "See WINDOWS.md for detailed setup instructions."
           echo "✅ Skipping Windows native build (not an error)"
@@ -414,32 +452,35 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: npm run test:ci
       
-      - name: Run unit tests (Windows)
-        if: matrix.os == 'windows-latest' && steps.check_faiss_ci.outputs.FAISS_FOUND == 'true' && success()
+      - name: Run unit tests (Windows - if FAISS installed)
+        if: matrix.os == 'windows-latest' && steps.check_faiss_early.outputs.FAISS_FOUND == 'true' && success()
         continue-on-error: true
         run: npm run test:ci
         shell: pwsh
       
       - name: Skip tests (Windows - FAISS not installed)
-        if: matrix.os == 'windows-latest' && steps.check_faiss_ci.outputs.FAISS_FOUND != 'true'
+        if: matrix.os == 'windows-latest' && steps.check_faiss_early.outputs.FAISS_FOUND != 'true'
         continue-on-error: true
         run: |
-          echo "⚠️ Windows native tests skipped - FAISS not installed."
+          echo "⚠️ Windows native tests skipped - FAISS not installed (this is expected)."
           echo "Windows users should use WSL2, VS Code Dev Container, or Docker Desktop."
           echo "See WINDOWS.md for detailed setup instructions."
+          echo "✅ Skipping Windows tests (not an error)"
           exit 0
         shell: bash
       
-      - name: Run integration tests
+      - name: Run integration tests (macOS/Linux)
         if: matrix.os != 'windows-latest'
         run: npm run test:integration
       
-      - name: Windows note (skip integration tests)
+      - name: Skip integration tests (Windows - FAISS not installed)
         if: matrix.os == 'windows-latest'
         continue-on-error: true
         run: |
-          echo "Windows native tests are skipped in CI. Use WSL2 or Docker."
-          echo "See WINDOWS.md for setup instructions."
+          echo "⚠️ Windows native integration tests skipped - FAISS not installed (this is expected)."
+          echo "Windows users should use WSL2, VS Code Dev Container, or Docker Desktop."
+          echo "See WINDOWS.md for detailed setup instructions."
+          echo "✅ Skipping Windows integration tests (not an error)"
           exit 0
         shell: bash
 

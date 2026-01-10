@@ -210,14 +210,11 @@ jobs:
         continue-on-error: true
         shell: bash
       
-      - name: Install npm dependencies
-        run: npm ci --ignore-scripts
-        continue-on-error: true
-      
-      - name: Check if FAISS is installed
+      - name: Check if FAISS is installed (Windows)
         id: check_faiss
         run: |
-          if [ -d "C:/faiss-install/include/faiss" ] || [ -d "C:/faiss/include" ]; then
+          echo "Checking for FAISS installation..."
+          if [ -d "C:/faiss-install/include/faiss" ] || [ -d "C:/faiss/include" ] || [ -d "C:/Program Files/faiss/include/faiss" ]; then
             echo "FAISS_FOUND=true" >> $GITHUB_OUTPUT
             echo "✅ FAISS headers found"
           else
@@ -227,7 +224,42 @@ jobs:
         continue-on-error: true
         shell: bash
       
-      - name: Build (Windows)
+      - name: Install npm dependencies (Windows - skip build if no FAISS)
+        if: steps.check_faiss.outputs.FAISS_FOUND != 'true'
+        continue-on-error: true
+        run: |
+          echo "⚠️ FAISS not installed - temporarily removing binding.gyp to prevent build"
+          if [ -f "binding.gyp" ]; then
+            cp binding.gyp binding.gyp.bak
+            rm binding.gyp
+            echo "✅ binding.gyp removed temporarily"
+          fi
+          
+          echo "Installing npm dependencies with --ignore-scripts..."
+          npm ci --ignore-scripts || {
+            echo "⚠️ npm ci had issues, but continuing (expected without FAISS)"
+            exit 0
+          }
+          
+          # Restore binding.gyp
+          if [ -f "binding.gyp.bak" ]; then
+            mv binding.gyp.bak binding.gyp
+            echo "✅ binding.gyp restored"
+          fi
+          
+          echo "✅ npm dependencies installed (build skipped)"
+        shell: bash
+      
+      - name: Install npm dependencies (Windows - with FAISS)
+        if: steps.check_faiss.outputs.FAISS_FOUND == 'true'
+        continue-on-error: true
+        run: |
+          echo "Installing npm dependencies (FAISS is installed, will build later)..."
+          npm ci --ignore-scripts
+          echo "✅ npm dependencies installed"
+        shell: bash
+      
+      - name: Build (Windows - if FAISS installed)
         if: steps.check_faiss.outputs.FAISS_FOUND == 'true'
         run: |
           echo "Building with FAISS found at C:/faiss-install"
@@ -247,6 +279,7 @@ jobs:
           echo "FAISS is not installed, so skipping build."
           echo "Windows users should use WSL2, VS Code Dev Container, or Docker Desktop."
           echo "See WINDOWS.md for detailed setup instructions."
+          echo "✅ Skipping Windows native build (not an error)"
           exit 0
         continue-on-error: true
         shell: bash
