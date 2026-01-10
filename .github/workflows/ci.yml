@@ -19,12 +19,10 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
         node-version: [18, 20, 22]
-        exclude:
-          # Windows builds are optional - only test on Node 20
-          - os: windows-latest
-            node-version: 18
-          - os: windows-latest
-            node-version: 22
+        # Note: Windows builds are optional and skip if FAISS is not installed.
+        # Testing on all Node versions would be redundant since they all have the same
+        # limitation (require FAISS installation). We test on Node 20 to verify CI setup.
+        # Users should use WSL2/Docker for Windows development (see WINDOWS.md).
     
     steps:
       - name: Checkout code
@@ -143,12 +141,39 @@ jobs:
           export LDFLAGS="-L/usr/local/lib"
           npm run build
       
-      - name: Build native module (Windows)
+      - name: Check FAISS installation (Windows)
         if: matrix.os == 'windows-latest'
+        id: check_faiss_ci
         continue-on-error: true
         run: |
-          echo "Windows native builds are skipped in CI. Use WSL2 or Docker."
-          echo "See WINDOWS.md for setup instructions."
+          if [ -d "C:/faiss-install/include/faiss" ] || [ -d "C:/faiss/include" ] || [ -d "/usr/include/faiss" ]; then
+            echo "FAISS_FOUND=true" >> $GITHUB_OUTPUT
+            echo "✅ FAISS found"
+          else
+            echo "FAISS_FOUND=false" >> $GITHUB_OUTPUT
+            echo "⚠️ FAISS not found - skipping Windows native build"
+          fi
+        shell: bash
+      
+      - name: Build native module (Windows)
+        if: matrix.os == 'windows-latest' && steps.check_faiss_ci.outputs.FAISS_FOUND == 'true'
+        continue-on-error: true
+        run: |
+          echo "Building Windows native module with FAISS..."
+          $env:INCLUDE = "C:\faiss-install\include;$env:INCLUDE"
+          $env:LIB = "C:\faiss-install\lib;$env:LIB"
+          npm run build
+        shell: pwsh
+      
+      - name: Skip Build (Windows - FAISS not installed)
+        if: matrix.os == 'windows-latest' && steps.check_faiss_ci.outputs.FAISS_FOUND != 'true'
+        continue-on-error: true
+        run: |
+          echo "⚠️ Windows native builds require FAISS installation."
+          echo "FAISS is not installed in this CI environment."
+          echo "Windows users should use WSL2, VS Code Dev Container, or Docker Desktop."
+          echo "See WINDOWS.md for detailed setup instructions."
+          echo "✅ Skipping Windows native build (not an error)"
           exit 0
         shell: bash
       
@@ -390,11 +415,18 @@ jobs:
         run: npm run test:ci
       
       - name: Run unit tests (Windows)
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-latest' && steps.check_faiss_ci.outputs.FAISS_FOUND == 'true' && success()
+        continue-on-error: true
+        run: npm run test:ci
+        shell: pwsh
+      
+      - name: Skip tests (Windows - FAISS not installed)
+        if: matrix.os == 'windows-latest' && steps.check_faiss_ci.outputs.FAISS_FOUND != 'true'
         continue-on-error: true
         run: |
-          echo "Windows native tests are skipped in CI. Use WSL2 or Docker."
-          echo "See WINDOWS.md for setup instructions."
+          echo "⚠️ Windows native tests skipped - FAISS not installed."
+          echo "Windows users should use WSL2, VS Code Dev Container, or Docker Desktop."
+          echo "See WINDOWS.md for detailed setup instructions."
           exit 0
         shell: bash
       

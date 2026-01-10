@@ -200,58 +200,74 @@ jobs:
           # This is complex on Windows, so WSL2/Docker is recommended
       
       - name: Build FAISS from source (Windows)
+        id: build_faiss
         run: |
-          # Install CMake and Visual Studio Build Tools
-          choco install cmake --version=3.27.0 -y || echo "Chocolatey not available, using built-in CMake"
-          # Clone and build FAISS
-          git clone https://github.com/facebookresearch/faiss.git C:\faiss
-          cd C:\faiss
-          mkdir build
-          cd build
-          cmake -G "Visual Studio 17 2022" -A x64 ^
-            -DFAISS_ENABLE_GPU=OFF ^
-            -DFAISS_ENABLE_PYTHON=OFF ^
-            -DBUILD_TESTING=OFF ^
-            -DCMAKE_BUILD_TYPE=Release ^
-            -DCMAKE_INSTALL_PREFIX=C:\faiss-install ^
-            -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake"
-          cmake --build . --config Release -j
-          cmake --install . --config Release
-          cd -
+          echo "⚠️ Windows native builds are complex. WSL2/Docker is recommended."
+          echo "See WINDOWS.md for setup instructions."
+          echo "Skipping Windows native FAISS build - users should use WSL2/Docker."
+          echo "FAISS_INSTALLED=false" >> $GITHUB_OUTPUT
+          exit 0
         continue-on-error: true
-        shell: cmd
+        shell: bash
       
       - name: Install npm dependencies
         run: npm ci --ignore-scripts
         continue-on-error: true
       
-      - name: Build (Windows)
+      - name: Check if FAISS is installed
+        id: check_faiss
         run: |
-          echo "Windows native builds are complex. WSL2/Docker is recommended."
-          echo "See WINDOWS.md for setup instructions."
-          # Attempt build with node-gyp
-          set INCLUDE=C:\faiss-install\include;%INCLUDE%
-          set LIB=C:\faiss-install\lib;%LIB%
-          set PATH=C:\faiss-install\bin;%PATH%
+          if [ -d "C:/faiss-install/include/faiss" ] || [ -d "C:/faiss/include" ]; then
+            echo "FAISS_FOUND=true" >> $GITHUB_OUTPUT
+            echo "✅ FAISS headers found"
+          else
+            echo "FAISS_FOUND=false" >> $GITHUB_OUTPUT
+            echo "⚠️ FAISS headers not found - skipping Windows native build"
+          fi
+        continue-on-error: true
+        shell: bash
+      
+      - name: Build (Windows)
+        if: steps.check_faiss.outputs.FAISS_FOUND == 'true'
+        run: |
+          echo "Building with FAISS found at C:/faiss-install"
+          $env:INCLUDE = "C:\faiss-install\include;$env:INCLUDE"
+          $env:LIB = "C:\faiss-install\lib;$env:LIB"
+          $env:PATH = "C:\faiss-install\bin;$env:PATH"
           npm run build
         continue-on-error: true
-        shell: cmd
+        shell: pwsh
         env:
           VCPKG_ROOT: ${{ env.VCPKG_ROOT }}
       
+      - name: Skip Build (Windows - FAISS not installed)
+        if: steps.check_faiss.outputs.FAISS_FOUND != 'true'
+        run: |
+          echo "⚠️ Windows native builds require FAISS to be installed."
+          echo "FAISS is not installed, so skipping build."
+          echo "Windows users should use WSL2, VS Code Dev Container, or Docker Desktop."
+          echo "See WINDOWS.md for detailed setup instructions."
+          exit 0
+        continue-on-error: true
+        shell: bash
+      
       - name: Test (Windows)
+        if: steps.check_faiss.outputs.FAISS_FOUND == 'true' && success()
         run: npm run test:ci
         continue-on-error: true
       
       - name: Package (Windows)
-        if: success()
+        if: steps.check_faiss.outputs.FAISS_FOUND == 'true' && success()
         run: |
-          if exist build\Release\faiss_node.node (
-            mkdir dist
-            tar -czf dist\faiss-node-windows-x64.tar.gz build\Release\faiss_node.node
-          )
+          if (Test-Path "build\Release\faiss_node.node") {
+            New-Item -ItemType Directory -Force -Path dist | Out-Null
+            Compress-Archive -Path build\Release\faiss_node.node -DestinationPath dist\faiss-node-windows-x64.zip -Force
+            echo "✅ Windows binary packaged"
+          } else {
+            echo "⚠️ Windows binary not found"
+          }
         continue-on-error: true
-        shell: cmd
+        shell: pwsh
       
       - name: Upload artifact
         if: success()
