@@ -1,5 +1,9 @@
 name: Docker Build and Test
 
+# This workflow validates the Docker approach documented in WINDOWS.md
+# It tests that Windows users can use Docker Desktop as documented
+# This validates WINDOWS.md Option 3 (Docker Desktop approach)
+
 on:
   push:
     branches: [ main, develop ]
@@ -8,8 +12,10 @@ on:
 
 jobs:
   docker-test:
-    name: Docker Build and Test
+    name: Docker Build and Test (Validates Windows Docker Approach)
     runs-on: ubuntu-latest
+    # Note: This tests Docker on Linux (same Docker that Windows users would use)
+    # This validates WINDOWS.md Option 3 (Docker Desktop) instructions work
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
