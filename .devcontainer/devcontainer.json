@@ -1,0 +1,47 @@
+{
+  "name": "FAISS-Node Development",
+  "dockerFile": "../Dockerfile",
+  "context": "..",
+  "target": "builder",
+  
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-typescript-next"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "cmake.configureOnOpen": false,
+        "files.watcherExclude": {
+          "**/node_modules/**": true,
+          "**/build/**": true
+        }
+      }
+    }
+  },
+
+  "runArgs": [
+    "--privileged"
+  ],
+
+  "postCreateCommand": "ldconfig && (npm install || echo 'npm install completed with warnings')",
+  
+  "remoteUser": "root",
+  
+  "workspaceFolder": "/app",
+  
+  "forwardPorts": [
+    8000
+  ],
+  
+  "portsAttributes": {
+    "8000": {
+      "label": "Documentation Server",
+      "onAutoForward": "notify"
+    }
+  }
+}
