@@ -386,6 +386,290 @@ const buffer = await index.toBuffer();
 const restoredIndex = await FaissIndex.fromBuffer(buffer);
 ```
 
+## Migration Guide
+
+### From Python FAISS
+
+If you're familiar with Python FAISS, migrating to `@faiss-node/native` is straightforward. Here are common patterns translated from Python to Node.js:
+
+#### Basic Index Creation and Search
+
+**Python FAISS:**
+```python
+import faiss
+import numpy as np
+
+# Create index
+d = 128  # dimensions
+index = faiss.IndexFlatL2(d)
+
+# Add vectors (numpy array)
+vectors = np.random.random((1000, d)).astype('float32')
+index.add(vectors)
+
+# Search
+query = np.random.random((1, d)).astype('float32')
+k = 10
+distances, labels = index.search(query, k)
+
+print(distances)  # [[0.1, 0.2, ...]]
+print(labels)     # [[0, 1, ...]]
+```
+
+**Node.js (@faiss-node/native):**
+```javascript
+const { FaissIndex } = require('@faiss-node/native');
+
+// Create index
+const d = 128;  // dimensions
+const index = new FaissIndex({ type: 'FLAT_L2', dims: d });
+
+// Add vectors (Float32Array)
+const vectors = new Float32Array(1000 * d);
+for (let i = 0; i < vectors.length; i++) {
+  vectors[i] = Math.random();
+}
+await index.add(vectors);
+
+// Search
+const query = new Float32Array(d);
+for (let i = 0; i < d; i++) {
+  query[i] = Math.random();
+}
+const k = 10;
+const results = await index.search(query, k);
+
+console.log(results.distances);  // Float32Array: [0.1, 0.2, ...]
+console.log(results.labels);     // Int32Array: [0, 1, ...]
+```
+
+#### IVF_FLAT Index (with Training)
+
+**Python FAISS:**
+```python
+import faiss
+
+d = 768
+nlist = 100
+index = faiss.IndexIVFFlat(faiss.IndexFlatL2(d), d, nlist)
+
+# Train on sample data
+training_vectors = np.random.random((10000, d)).astype('float32')
+index.train(training_vectors)
+
+# Add vectors
+vectors = np.random.random((100000, d)).astype('float32')
+index.add(vectors)
+
+# Set nprobe for search
+index.nprobe = 10
+distances, labels = index.search(query, k)
+```
+
+**Node.js (@faiss-node/native):**
+```javascript
+const { FaissIndex } = require('@faiss-node/native');
+
+const d = 768;
+const nlist = 100;
+const index = new FaissIndex({ 
+  type: 'IVF_FLAT', 
+  dims: d, 
+  nlist: nlist 
+});
+
+// Train on sample data
+const trainingVectors = new Float32Array(10000 * d);
+for (let i = 0; i < trainingVectors.length; i++) {
+  trainingVectors[i] = Math.random();
+}
+await index.train(trainingVectors);
+
+// Add vectors
+const vectors = new Float32Array(100000 * d);
+for (let i = 0; i < vectors.length; i++) {
+  vectors[i] = Math.random();
+}
+await index.add(vectors);
+
+// Set nprobe for search
+index.setNprobe(10);
+const results = await index.search(query, k);
+```
+
+#### HNSW Index
+
+**Python FAISS:**
+```python
+import faiss
+
+d = 1536
+M = 16
+index = faiss.IndexHNSWFlat(d, M)
+
+# Add vectors (no training needed)
+vectors = np.random.random((1000000, d)).astype('float32')
+index.add(vectors)
+
+# Search with ef parameter
+index.hnsw.efSearch = 50
+distances, labels = index.search(query, k)
+```
+
+**Node.js (@faiss-node/native):**
+```javascript
+const { FaissIndex } = require('@faiss-node/native');
+
+const d = 1536;
+const index = new FaissIndex({ 
+  type: 'HNSW', 
+  dims: d,
+  M: 16,              // Connections per node
+  efSearch: 50       // Search parameter (equivalent to index.hnsw.efSearch)
+});
+
+// Add vectors (no training needed)
+const vectors = new Float32Array(1000000 * d);
+for (let i = 0; i < vectors.length; i++) {
+  vectors[i] = Math.random();
+}
+await index.add(vectors);
+
+// Search (efSearch already set in constructor)
+const results = await index.search(query, k);
+```
+
+#### Save and Load Index
+
+**Python FAISS:**
+```python
+# Save to disk
+faiss.write_index(index, "index.faiss")
+
+# Load from disk
+loaded_index = faiss.read_index("index.faiss")
+```
+
+**Node.js (@faiss-node/native):**
+```javascript
+// Save to disk (async)
+await index.save("index.faiss");
+
+// Load from disk (static method, async)
+const loadedIndex = await FaissIndex.load("index.faiss");
+```
+
+#### Batch Search (Multiple Queries)
+
+**Python FAISS:**
+```python
+# Multiple queries (nq queries)
+queries = np.random.random((100, d)).astype('float32')
+distances, labels = index.search(queries, k)
+# distances shape: (100, k)
+# labels shape: (100, k)
+```
+
+**Node.js (@faiss-node/native):**
+```javascript
+// Multiple queries (nq queries)
+const queries = new Float32Array(100 * d);
+for (let i = 0; i < queries.length; i++) {
+  queries[i] = Math.random();
+}
+const results = await index.searchBatch(queries, k);
+// results.distances: Float32Array of shape [100 * k]
+// results.labels: Int32Array of shape [100 * k]
+// results.nq: 100
+// results.k: k
+```
+
+#### Key Differences
+
+| Feature | Python FAISS | Node.js (@faiss-node/native) |
+|---------|-------------|------------------------------|
+| **Index Creation** | `faiss.IndexFlatL2(d)` | `new FaissIndex({ type: 'FLAT_L2', dims: d })` |
+| **Add Vectors** | `index.add(vectors)` (synchronous) | `await index.add(vectors)` (async) |
+| **Search** | `index.search(queries, k)` (synchronous) | `await index.search(query, k)` (async) |
+| **Batch Search** | `index.search(queries, k)` (same method) | `await index.searchBatch(queries, k)` (separate method) |
+| **Training** | `index.train(vectors)` (synchronous) | `await index.train(vectors)` (async) |
+| **Save/Load** | `faiss.write_index()` / `faiss.read_index()` (synchronous) | `await index.save()` / `await FaissIndex.load()` (async) |
+| **nprobe (IVF)** | `index.nprobe = 10` | `index.setNprobe(10)` |
+| **efSearch (HNSW)** | `index.hnsw.efSearch = 50` | Set in constructor or use `efSearch` config |
+| **Vector Format** | `numpy.ndarray` (float32) | `Float32Array` |
+| **Results Format** | Tuple `(distances, labels)` as numpy arrays | Object `{ distances: Float32Array, labels: Int32Array }` |
+
+#### Common Patterns
+
+**Pattern 1: Converting numpy arrays to Float32Array**
+
+If you have Python code that generates embeddings and want to use them in Node.js:
+
+```python
+# Python: Save embeddings
+import numpy as np
+embeddings = model.encode(texts)  # numpy array, shape (n, d)
+np.save('embeddings.npy', embeddings)
+```
+
+```javascript
+// Node.js: Load embeddings
+const fs = require('fs');
+// Assuming you converted .npy to binary format
+const embeddingsBuffer = fs.readFileSync('embeddings.bin');
+const embeddings = new Float32Array(embeddingsBuffer.buffer);
+await index.add(embeddings);
+```
+
+**Pattern 2: Chunked Add Operations**
+
+**Python FAISS:**
+```python
+batch_size = 10000
+for i in range(0, len(vectors), batch_size):
+    batch = vectors[i:i+batch_size]
+    index.add(batch)
+```
+
+**Node.js (@faiss-node/native):**
+```javascript
+const batchSize = 10000;
+for (let i = 0; i < vectors.length; i += batchSize * dims) {
+  const batch = vectors.slice(i, i + batchSize * dims);
+  await index.add(batch);
+}
+```
+
+**Pattern 3: Memory Management**
+
+**Python FAISS:**
+```python
+# Index is automatically garbage collected
+# But you can delete explicitly:
+del index
+```
+
+**Node.js (@faiss-node/native):**
+```javascript
+// Explicitly dispose to free native memory
+index.dispose();
+
+// Or let garbage collector handle it
+// (but explicit dispose is recommended for large indexes)
+```
+
+#### Migration Checklist
+
+- [ ] Replace `import faiss` with `require('@faiss-node/native')`
+- [ ] Convert `numpy.ndarray` to `Float32Array`
+- [ ] Add `await` to all async operations (add, search, train, save, load)
+- [ ] Replace `index.search(queries, k)` for batch with `index.searchBatch(queries, k)`
+- [ ] Use constructor config object instead of direct index instantiation
+- [ ] Replace `index.nprobe = X` with `index.setNprobe(X)` for IVF
+- [ ] Set `efSearch` in constructor config for HNSW instead of `index.hnsw.efSearch`
+- [ ] Handle results as `{ distances, labels }` object instead of tuple
+- [ ] Add `index.dispose()` when done with large indexes (optional but recommended)
+
 ## Performance Tips
 
 1. **Use HNSW for large datasets** - Best overall performance
@@ -393,6 +677,8 @@ const restoredIndex = await FaissIndex.fromBuffer(buffer);
 3. **Train IVF properly** - Use 10k-100k training vectors
 4. **Tune parameters** - Increase `nprobe` (IVF) or `efSearch` (HNSW) for accuracy
 5. **Reuse indexes** - Save/load instead of recreating
+
+For detailed benchmarks and performance comparisons, see `examples/benchmark.js`.
 
 ## Thread Safety
 
