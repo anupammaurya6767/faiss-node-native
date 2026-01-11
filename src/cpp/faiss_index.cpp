@@ -298,3 +298,69 @@ void FaissIndexWrapper::MergeFrom(const FaissIndexWrapper& other) {
         throw std::runtime_error(std::string("Failed to merge index: ") + e.what());
     }
 }
+
+void FaissIndexWrapper::Reset() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    if (disposed_) {
+        throw std::runtime_error("Index has been disposed");
+    }
+    
+    try {
+        // FAISS reset() clears all vectors but keeps the index structure
+        index_->reset();
+    } catch (const std::exception& e) {
+        throw std::runtime_error(std::string("Failed to reset index: ") + e.what());
+    }
+}
+
+size_t FaissIndexWrapper::RangeSearch(const float* query, float radius,
+                                      std::vector<float>& distances,
+                                      std::vector<int64_t>& labels,
+                                      std::vector<size_t>& lims) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    if (disposed_) {
+        throw std::runtime_error("Index has been disposed");
+    }
+    
+    if (query == nullptr) {
+        throw std::invalid_argument("Query pointer cannot be null");
+    }
+    
+    if (radius < 0) {
+        throw std::invalid_argument("Radius must be non-negative");
+    }
+    
+    size_t ntotal = index_->ntotal;
+    if (ntotal == 0) {
+        throw std::runtime_error("Cannot search empty index");
+    }
+    
+    try {
+        // FAISS range_search returns RangeSearchResult
+        faiss::RangeSearchResult result(1);  // nq=1 (single query)
+        
+        // Perform range search (nq=1, single query)
+        index_->range_search(1, query, radius, &result);
+        
+        // Extract results
+        size_t total = result.lims[1];  // Total results for query 0
+        distances.resize(total);
+        labels.resize(total);
+        lims.resize(2);  // [0, total]
+        
+        // Copy distances and labels
+        for (size_t i = 0; i < total; i++) {
+            distances[i] = result.distances[i];
+            labels[i] = result.labels[i];
+        }
+        
+        lims[0] = 0;
+        lims[1] = total;
+        
+        return total;
+    } catch (const std::exception& e) {
+        throw std::runtime_error(std::string("Failed to range search: ") + e.what());
+    }
+}

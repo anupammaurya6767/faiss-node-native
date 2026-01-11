@@ -24,7 +24,7 @@ class FaissIndex {
     /**
      * Create a new FAISS index
      * @param {Object} config - Configuration object
-     * @param {string} config.type - Index type ('FLAT_L2', 'IVF_FLAT', or 'HNSW')
+     * @param {string} config.type - Index type ('FLAT_L2', 'FLAT_IP', 'IVF_FLAT', or 'HNSW')
      * @param {number} config.dims - Vector dimensions (required)
      */
     constructor(config) {
@@ -33,7 +33,7 @@ class FaissIndex {
         }
         
         // Validate index type
-        const validTypes = ['FLAT_L2', 'IVF_FLAT', 'HNSW'];
+        const validTypes = ['FLAT_L2', 'FLAT_IP', 'IVF_FLAT', 'HNSW'];
         if (config.type && !validTypes.includes(config.type)) {
             throw new Error(`Index type '${config.type}' not supported. Supported types: ${validTypes.join(', ')}`);
         }
@@ -218,6 +218,45 @@ class FaissIndex {
     }
     
     /**
+     * Range search: find all vectors within distance threshold
+     * @param {Float32Array} query - Query vector
+     * @param {number} radius - Maximum distance threshold
+     * @returns {Promise<{distances: Float32Array, labels: Int32Array, nq: number, lims: Uint32Array}>}
+     */
+    async rangeSearch(query, radius) {
+        if (!(query instanceof Float32Array)) {
+            throw new TypeError('query must be a Float32Array');
+        }
+        
+        if (query.length !== this._dims) {
+            throw new Error(
+                `Query vector length (${query.length}) must match index dimensions (${this._dims})`
+            );
+        }
+        
+        if (typeof radius !== 'number' || radius < 0 || !isFinite(radius)) {
+            throw new TypeError('radius must be a non-negative finite number');
+        }
+        
+        if (!this._native) {
+            throw new Error('Index has been disposed');
+        }
+        
+        // Async operation using background worker
+        try {
+            const results = await this._native.rangeSearch(query, radius);
+            return {
+                distances: results.distances,
+                labels: results.labels,
+                nq: results.nq,
+                lims: results.lims
+            };
+        } catch (error) {
+            throw new Error(`Range search failed: ${error.message}`);
+        }
+    }
+    
+    /**
      * Get index statistics
      * @returns {Object} Statistics object
      */
@@ -226,6 +265,23 @@ class FaissIndex {
             return this._native.getStats();
         } catch (error) {
             throw new Error(`Failed to get stats: ${error.message}`);
+        }
+    }
+    
+    /**
+     * Reset the index (clear all vectors, keep index structure)
+     * Useful for reusing an index object without creating a new one
+     * @returns {void}
+     */
+    reset() {
+        if (!this._native) {
+            throw new Error('Index has been disposed');
+        }
+        
+        try {
+            this._native.reset();
+        } catch (error) {
+            throw new Error(`Failed to reset index: ${error.message}`);
         }
     }
     

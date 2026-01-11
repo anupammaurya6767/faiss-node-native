@@ -11,7 +11,7 @@ High-performance Node.js native bindings for [Facebook FAISS](https://github.com
 
 - 🚀 **Async Operations** - Non-blocking Promise-based API that never blocks the event loop
 - 🔒 **Thread-Safe** - Mutex-protected concurrent operations for production workloads
-- 📦 **Multiple Index Types** - FLAT_L2, IVF_FLAT, and HNSW with optimized defaults
+- 📦 **Multiple Index Types** - FLAT_L2, FLAT_IP (cosine similarity), IVF_FLAT, and HNSW with optimized defaults
 - 💾 **Persistence** - Save/load indexes to disk or serialize to buffers
 - ⚡ **High Performance** - Direct C++ bindings with zero-copy data transfer
 - 📚 **TypeScript Support** - Full type definitions included
@@ -124,6 +124,11 @@ const index = new FaissIndex(config);
 // FLAT_L2 - Exact search (best for small datasets < 10k vectors)
 const flatIndex = new FaissIndex({ type: 'FLAT_L2', dims: 128 });
 
+// FLAT_IP - Inner Product (for cosine similarity with normalized vectors)
+const flatIPIndex = new FaissIndex({ type: 'FLAT_IP', dims: 1536 });
+// Note: Vectors must be L2-normalized for cosine similarity
+// For normalized vectors: cosine_similarity(a, b) = dot_product(a, b) = inner_product(a, b)
+
 // IVF_FLAT - Fast approximate search (best for 10k - 1M vectors)
 const ivfIndex = new FaissIndex({ 
   type: 'IVF_FLAT', 
@@ -181,6 +186,48 @@ const results = await index.search(query, 5);
 - `labels` (Int32Array): Indices of nearest neighbors
 
 #### `searchBatch(queries: Float32Array, k: number): Promise<SearchResults>`
+
+Batch search for k nearest neighbors (multiple queries).
+
+```javascript
+// Multiple queries
+const queries = new Float32Array([
+  1, 0, 0, 0,  // Query 1
+  0, 1, 0, 0   // Query 2
+]);
+const results = await index.searchBatch(queries, 5);
+
+// results.distances: Float32Array of shape [nq * k]
+// results.labels: Int32Array of shape [nq * k]
+// results.nq: number of queries
+// results.k: number of neighbors per query
+```
+
+#### `rangeSearch(query: Float32Array, radius: number): Promise<RangeSearchResults>`
+
+Find all vectors within a distance threshold (range search). Useful for filtering by distance or clustering.
+
+```javascript
+const query = new Float32Array([1, 0, 0, 0]);
+const radius = 2.0;  // Maximum distance threshold
+const results = await index.rangeSearch(query, radius);
+
+// results.distances: Float32Array of distances
+// results.labels: Int32Array of vector indices
+// results.nq: number of queries (always 1 for single query)
+// results.lims: Uint32Array [0, n] where n is total number of results
+// Results are sorted by distance (closest first)
+
+// Example: Extract results for a single query
+const nResults = results.lims[1];
+for (let i = 0; i < nResults; i++) {
+  const label = results.labels[i];
+  const distance = results.distances[i];
+  console.log(`Vector ${label} at distance ${distance}`);
+}
+```
+
+**Note:** Range search returns a variable number of results (all vectors within radius), unlike `search()` which always returns exactly `k` results.
 
 Perform batch search for multiple queries efficiently.
 

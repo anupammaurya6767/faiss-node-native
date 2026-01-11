@@ -155,6 +155,77 @@ private:
     Napi::Promise::Deferred deferred_;
 };
 
+// RangeSearch Worker
+class RangeSearchWorker : public Napi::AsyncWorker {
+public:
+    RangeSearchWorker(FaissIndexWrapper* wrapper, const float* query, float radius, Napi::Promise::Deferred deferred)
+        : Napi::AsyncWorker(deferred.Env(), "RangeSearchWorker"),
+          wrapper_(wrapper),
+          query_(query, query + wrapper->GetDimensions()),
+          radius_(radius),
+          deferred_(deferred) {
+    }
+
+    void Execute() override {
+        try {
+            if (wrapper_->IsDisposed()) {
+                SetError("Index has been disposed");
+                return;
+            }
+            
+            size_t ntotal = wrapper_->GetTotalVectors();
+            if (ntotal == 0) {
+                SetError("Cannot search empty index");
+                return;
+            }
+            
+            wrapper_->RangeSearch(query_.data(), radius_, distances_, labels_, lims_);
+        } catch (const std::exception& e) {
+            SetError(std::string("FAISS error: ") + e.what());
+        }
+    }
+
+    void OnOK() override {
+        Napi::Env env = Env();
+        Napi::Object result = Napi::Object::New(env);
+        
+        Napi::Float32Array distances = Napi::Float32Array::New(env, distances_.size());
+        memcpy(distances.Data(), distances_.data(), distances_.size() * sizeof(float));
+        
+        Napi::Int32Array labels = Napi::Int32Array::New(env, labels_.size());
+        int32_t* labelsData = labels.Data();
+        for (size_t i = 0; i < labels_.size(); i++) {
+            labelsData[i] = static_cast<int32_t>(labels_[i]);
+        }
+        
+        Napi::Uint32Array lims = Napi::Uint32Array::New(env, lims_.size());
+        uint32_t* limsData = lims.Data();
+        for (size_t i = 0; i < lims_.size(); i++) {
+            limsData[i] = static_cast<uint32_t>(lims_[i]);
+        }
+        
+        result.Set("distances", distances);
+        result.Set("labels", labels);
+        result.Set("nq", Napi::Number::New(env, 1));
+        result.Set("lims", lims);
+        
+        deferred_.Resolve(result);
+    }
+
+    void OnError(const Napi::Error& e) override {
+        deferred_.Reject(e.Value());
+    }
+
+private:
+    FaissIndexWrapper* wrapper_;
+    std::vector<float> query_;
+    float radius_;
+    std::vector<float> distances_;
+    std::vector<int64_t> labels_;
+    std::vector<size_t> lims_;
+    Napi::Promise::Deferred deferred_;
+};
+
 // SearchBatch Worker
 class SearchBatchWorker : public Napi::AsyncWorker {
 public:
@@ -354,12 +425,14 @@ private:
     Napi::Value Train(const Napi::CallbackInfo& info);
     Napi::Value Search(const Napi::CallbackInfo& info);
     Napi::Value SearchBatch(const Napi::CallbackInfo& info);
+    Napi::Value RangeSearch(const Napi::CallbackInfo& info);
     Napi::Value GetStats(const Napi::CallbackInfo& info);
     Napi::Value Dispose(const Napi::CallbackInfo& info);
     Napi::Value Save(const Napi::CallbackInfo& info);
     Napi::Value ToBuffer(const Napi::CallbackInfo& info);
     Napi::Value MergeFrom(const Napi::CallbackInfo& info);
     Napi::Value SetNprobe(const Napi::CallbackInfo& info);
+    Napi::Value Reset(const Napi::CallbackInfo& info);
     
     // Static methods
     static Napi::Value Load(const Napi::CallbackInfo& info);
@@ -380,12 +453,14 @@ Napi::Object FaissIndexWrapperJS::Init(Napi::Env env, Napi::Object exports) {
         InstanceMethod("train", &FaissIndexWrapperJS::Train),
         InstanceMethod("search", &FaissIndexWrapperJS::Search),
         InstanceMethod("searchBatch", &FaissIndexWrapperJS::SearchBatch),
+        InstanceMethod("rangeSearch", &FaissIndexWrapperJS::RangeSearch),
         InstanceMethod("getStats", &FaissIndexWrapperJS::GetStats),
         InstanceMethod("dispose", &FaissIndexWrapperJS::Dispose),
         InstanceMethod("save", &FaissIndexWrapperJS::Save),
         InstanceMethod("toBuffer", &FaissIndexWrapperJS::ToBuffer),
         InstanceMethod("mergeFrom", &FaissIndexWrapperJS::MergeFrom),
         InstanceMethod("setNprobe", &FaissIndexWrapperJS::SetNprobe),
+        InstanceMethod("reset", &FaissIndexWrapperJS::Reset),
         StaticMethod("load", &FaissIndexWrapperJS::Load),
         StaticMethod("fromBuffer", &FaissIndexWrapperJS::FromBuffer),
     });
@@ -433,6 +508,9 @@ FaissIndexWrapperJS::FaissIndexWrapperJS(const Napi::CallbackInfo& info)
             if (type == "FLAT_L2") {
                 indexDescription = "Flat";
                 metric = 1;  // METRIC_L2
+            } else if (type == "FLAT_IP") {
+                indexDescription = "Flat";
+                metric = 0;  // METRIC_INNER_PRODUCT
             } else if (type == "IVF_FLAT") {
                 // Build IVF string: "IVF{nlist},Flat"
                 int nlist = 100;  // Default number of clusters
@@ -450,7 +528,7 @@ FaissIndexWrapperJS::FaissIndexWrapperJS(const Napi::CallbackInfo& info)
                 indexDescription = "HNSW" + std::to_string(M);
                 metric = 1;  // METRIC_L2
             } else {
-                throw Napi::TypeError::New(env, "Unsupported index type: " + type + ". Supported: FLAT_L2, IVF_FLAT, HNSW");
+                throw Napi::TypeError::New(env, "Unsupported index type: " + type + ". Supported: FLAT_L2, FLAT_IP, IVF_FLAT, HNSW");
             }
         }
         
@@ -737,6 +815,61 @@ Napi::Value FaissIndexWrapperJS::SearchBatch(const Napi::CallbackInfo& info) {
     }
 }
 
+Napi::Value FaissIndexWrapperJS::RangeSearch(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    
+    try {
+        ValidateNotDisposed(env);
+        
+        if (info.Length() < 2) {
+            throw Napi::TypeError::New(env, "Expected 2 arguments: query (Float32Array), radius (number)");
+        }
+        
+        if (!info[0].IsTypedArray()) {
+            throw Napi::TypeError::New(env, "Expected Float32Array for query");
+        }
+        
+        if (!info[1].IsNumber()) {
+            throw Napi::TypeError::New(env, "Expected number for radius");
+        }
+        
+        Napi::TypedArray arr = info[0].As<Napi::TypedArray>();
+        if (arr.TypedArrayType() != napi_float32_array) {
+            throw Napi::TypeError::New(env, "Expected Float32Array for query");
+        }
+        
+        Napi::Float32Array queryArr = arr.As<Napi::Float32Array>();
+        float radius = info[1].As<Napi::Number>().FloatValue();
+        
+        if (static_cast<int>(queryArr.ElementLength()) != dims_) {
+            throw Napi::RangeError::New(env, 
+                "Query vector length must match index dimensions. Got " + 
+                std::to_string(queryArr.ElementLength()) + ", expected " + std::to_string(dims_));
+        }
+        
+        if (radius < 0) {
+            throw Napi::RangeError::New(env, "Radius must be non-negative");
+        }
+        
+        // Get query pointer (zero-copy read) - copy data for async worker
+        const float* query = queryArr.Data();
+        
+        // Create promise and async worker
+        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
+        RangeSearchWorker* worker = new RangeSearchWorker(wrapper_.get(), query, radius, deferred);
+        worker->Queue();
+        
+        return deferred.Promise();
+        
+    } catch (const Napi::Error& e) {
+        throw; // Re-throw N-API errors
+    } catch (const std::exception& e) {
+        throw Napi::Error::New(env, std::string("FAISS error: ") + e.what());
+    } catch (...) {
+        throw Napi::Error::New(env, "Unknown error in rangeSearch()");
+    }
+}
+
 Napi::Value FaissIndexWrapperJS::GetStats(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     
@@ -768,6 +901,26 @@ Napi::Value FaissIndexWrapperJS::Dispose(const Napi::CallbackInfo& info) {
     }
     
     return env.Undefined();
+}
+
+Napi::Value FaissIndexWrapperJS::Reset(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    
+    try {
+        ValidateNotDisposed(env);
+        
+        // Reset is synchronous (clears vectors, keeps index structure)
+        wrapper_->Reset();
+        
+        return env.Undefined();
+        
+    } catch (const Napi::Error& e) {
+        throw; // Re-throw N-API errors
+    } catch (const std::exception& e) {
+        throw Napi::Error::New(env, std::string("FAISS error: ") + e.what());
+    } catch (...) {
+        throw Napi::Error::New(env, "Unknown error in reset()");
+    }
 }
 
 Napi::Float32Array FaissIndexWrapperJS::CreateFloat32Array(Napi::Env env, size_t length, const float* data) {
