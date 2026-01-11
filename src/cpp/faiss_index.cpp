@@ -8,6 +8,7 @@
 #include <faiss/index_factory.h>
 #include <faiss/index_io.h>
 #include <faiss/impl/io.h>
+#include <faiss/impl/AuxIndexStructures.h>
 #include <fstream>
 #include <sstream>
 #include <cstdio>
