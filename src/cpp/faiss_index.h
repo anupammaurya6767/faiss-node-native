@@ -88,6 +88,21 @@ public:
     // Merge vectors from another index
     // other: reference to another FaissIndexWrapper
     void MergeFrom(const FaissIndexWrapper& other);
+    
+    // Reset: clear all vectors from the index (reuse index object)
+    void Reset();
+    
+    // Range search: find all vectors within radius
+    // query: pointer to query vector (dims elements)
+    // radius: maximum distance threshold
+    // distances: output array (variable length, caller must allocate buffer)
+    // labels: output array (variable length, caller must allocate buffer)
+    // lims: output array (nq+1 elements) - limits for each query result
+    // Returns: total number of results found
+    size_t RangeSearch(const float* query, float radius, 
+                       std::vector<float>& distances, 
+                       std::vector<int64_t>& labels,
+                       std::vector<size_t>& lims) const;
 
 private:
     std::unique_ptr<faiss::Index> index_;  // Base Index pointer (can hold any index type)
