@@ -359,6 +359,32 @@ index.dispose();
 - **No training required**
 - **Use case:** Large-scale production systems, best overall performance
 
+### FLAT_IP (IndexFlatIP) - Inner Product for Cosine Similarity
+
+- **Best for:** Cosine similarity with L2-normalized vectors (e.g., OpenAI embeddings)
+- **Speed:** O(n) per query - same as FLAT_L2
+- **Accuracy:** 100% recall (exact results)
+- **Memory:** Same as FLAT_L2
+- **Requires:** Vectors must be L2-normalized before adding
+- **Use case:** When you need cosine similarity (with normalized vectors, inner product = cosine similarity)
+- **Note:** For cosine similarity, normalize vectors first: `cosine_similarity(a, b) = dot_product(normalize(a), normalize(b))`
+
+**When to use FLAT_IP vs Database Cosine Functions:**
+
+FLAT_IP is optimized for large-scale, high-dimensional vector searches. Database cosine functions (PostgreSQL `pgvector`, MongoDB, etc.) are simpler for SQL integration but may be slower at scale.
+
+**Choose FLAT_IP when:**
+- Large datasets (100k+ vectors)
+- High-dimensional vectors (512+ dimensions)
+- Frequent searches (better performance)
+- Need batch operations or complex indexes (IVF/HNSW with IP)
+
+**Choose Database Cosine when:**
+- Small datasets (< 10k vectors)
+- Need SQL integration
+- Data already in database
+- Need ACID transactions or complex SQL filtering
+
 ## Examples
 
 ### Basic Semantic Search
