@@ -185,3 +185,74 @@ describe('FaissIndex', () => {
     });
   });
 });
+
+// Helper function to normalize vectors (L2 normalization)
+function normalizeL2(vector) {
+  const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
+  return vector.map(val => val / magnitude);
+}
+
+describe('FLAT_IP Index', () => {
+  it('should create FLAT_IP index', () => {
+    const index = new FaissIndex({ type: 'FLAT_IP', dims: 4 });
+    expect(index).toBeDefined();
+    const stats = index.getStats();
+    expect(stats.dims).toBe(4);
+  });
+
+  it('should search with normalized vectors (cosine similarity)', async () => {
+    const index = new FaissIndex({ type: 'FLAT_IP', dims: 4 });
+    const vectors = [
+      [1, 0, 0, 0],
+      [0, 1, 0, 0],
+      [0, 0, 1, 0]
+    ];
+    // Normalize vectors
+    const normalized = vectors.map(v => normalizeL2(v));
+    const vectorsArray = new Float32Array(normalized.flat());
+    await index.add(vectorsArray);
+    
+    const query = normalizeL2([1, 0, 0, 0]);
+    const results = await index.search(new Float32Array(query), 2);
+    expect(results.labels.length).toBe(2);
+    // Higher inner product = more similar (cosine similarity)
+    expect(results.distances[0]).toBeGreaterThan(results.distances[1]);
+  });
+});
+
+describe('Range Search', () => {
+  it('should find vectors within radius', async () => {
+    const index = new FaissIndex({ type: 'FLAT_L2', dims: 4 });
+    const vectors = new Float32Array([
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1
+    ]);
+    await index.add(vectors);
+    
+    const query = new Float32Array([1, 0, 0, 0]);
+    const results = await index.rangeSearch(query, 2.0);
+    expect(results.nq).toBe(1);
+    expect(results.lims.length).toBe(2);
+    expect(results.lims[0]).toBe(0);
+    expect(results.lims[1]).toBeGreaterThan(0);
+    expect(results.distances.length).toBe(results.labels.length);
+  });
+});
+
+describe('Reset Method', () => {
+  it('should clear all vectors', async () => {
+    const index = new FaissIndex({ type: 'FLAT_L2', dims: 4 });
+    const vectors = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0]);
+    await index.add(vectors);
+    expect(index.getStats().ntotal).toBe(2);
+    
+    index.reset();
+    expect(index.getStats().ntotal).toBe(0);
+    
+    // Should be able to add vectors again
+    await index.add(vectors);
+    expect(index.getStats().ntotal).toBe(2);
+  });
+});
