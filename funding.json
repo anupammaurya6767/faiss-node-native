@@ -5,7 +5,7 @@
     "role": "maintainer",
     "name": "Anupam Maurya",
     "github": "anupammaurya6767",
-    "webpageUrl": "https://github.com/anupammaurya6767", 
+    "webpageUrl": "https://github.com/anupammaurya6767",
     "description": "Maintainer of @faiss-node/native — high-performance Node.js native C++ bindings for Facebook FAISS, built for RAG pipelines and vector similarity search."
   },
   "projects": [
