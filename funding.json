@@ -4,26 +4,43 @@
     "type": "individual",
     "role": "maintainer",
     "name": "Anupam Maurya",
-    "github": "anupammaurya6767",
-    "webpageUrl": { "url": "https://github.com/anupammaurya6767" },
-    "description": "Maintainer of @faiss-node/native — high-performance Node.js native C++ bindings for Facebook FAISS, built for RAG pipelines and vector similarity search."
+    "email": "anupammaurya981@gmail.com",
+    "phone": "",
+    "description": "Maintainer of @faiss-node/native — high-performance Node.js native C++ bindings for Facebook FAISS, built for RAG pipelines and vector similarity search.",
+    "webpageUrl": {
+      "url": "https://github.com/anupammaurya6767"
+    }
   },
   "projects": [
     {
       "guid": "faiss-node-native",
       "name": "@faiss-node/native",
       "description": "Async, thread-safe Node.js native bindings for Facebook FAISS. Supports FLAT_L2, FLAT_IP, IVF_FLAT, and HNSW indexes with TypeScript support and zero-copy C++ data transfer. Designed for production RAG applications and semantic search pipelines.",
-      "webpageUrl": { "url": "https://github.com/anupammaurya6767/faiss-node-native" },
-      "repositoryUrl": { "url": "https://github.com/anupammaurya6767/faiss-node-native" },
-      "licenses": ["spdx:MIT"],
-      "tags": ["nodejs", "faiss", "vector-search", "rag", "native-bindings", "ai", "typescript"]
+      "webpageUrl": {
+        "url": "https://github.com/anupammaurya6767/faiss-node-native"
+      },
+      "repositoryUrl": {
+        "url": "https://github.com/anupammaurya6767/faiss-node-native"
+      },
+      "licenses": [
+        "spdx:MIT"
+      ],
+      "tags": [
+        "nodejs",
+        "faiss",
+        "vector-search",
+        "rag",
+        "native-bindings",
+        "ai",
+        "typescript"
+      ]
     }
   ],
   "funding": {
     "channels": [
       {
         "guid": "github-sponsors",
-        "type": "github_sponsors",
+        "type": "payment-provider",
         "address": "anupammaurya6767",
         "description": "GitHub Sponsors"
       }
@@ -31,20 +48,25 @@
     "plans": [
       {
         "guid": "maintenance",
+        "status": "active",
         "name": "Ongoing Maintenance",
         "description": "Covers CI costs for native C++ builds across Linux/macOS, dependency updates, issue triage, and FAISS version compatibility.",
         "amount": 50,
         "currency": "USD",
-        "frequency": "monthly"
+        "frequency": "monthly",
+        "channels": null
       },
       {
         "guid": "growth",
+        "status": "active",
         "name": "Feature Development",
         "description": "GPU index support, Windows native builds, and expanded index types (IVF_PQ, ScaNN). Enables full-time attention to the project.",
         "amount": 100,
         "currency": "USD",
-        "frequency": "monthly"
+        "frequency": "monthly",
+        "channels": null
       }
-    ]
+    ],
+    "history": null
   }
 }
