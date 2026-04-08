@@ -1,0 +1,49 @@
+{
+  "version": "v1.0.0",
+  "entity": {
+    "type": "individual",
+    "role": "maintainer",
+    "name": "Anupam Maurya",
+    "github": "anupammaurya6767",
+    "description": "Maintainer of @faiss-node/native — high-performance Node.js native C++ bindings for Facebook FAISS, built for RAG pipelines and vector similarity search."
+  },
+  "projects": [
+    {
+      "guid": "faiss-node-native",
+      "name": "@faiss-node/native",
+      "description": "Async, thread-safe Node.js native bindings for Facebook FAISS. Supports FLAT_L2, FLAT_IP, IVF_FLAT, and HNSW indexes with TypeScript support and zero-copy C++ data transfer. Designed for production RAG applications and semantic search pipelines.",
+      "web_url": "https://github.com/anupammaurya6767/faiss-node-native",
+      "repository": "https://github.com/anupammaurya6767/faiss-node-native",
+      "licenses": ["MIT"],
+      "tags": ["nodejs", "faiss", "vector-search", "rag", "native-bindings", "ai", "typescript"]
+    }
+  ],
+  "funding": {
+    "channels": [
+      {
+        "guid": "github-sponsors",
+        "type": "github_sponsors",
+        "address": "anupammaurya6767",
+        "description": "GitHub Sponsors"
+      }
+    ],
+    "plans": [
+      {
+        "guid": "maintenance",
+        "name": "Ongoing Maintenance",
+        "description": "Covers CI costs for native C++ builds across Linux/macOS, dependency updates, issue triage, and FAISS version compatibility.",
+        "amount": 25,
+        "currency": "USD",
+        "frequency": "monthly"
+      },
+      {
+        "guid": "growth",
+        "name": "Feature Development",
+        "description": "GPU index support, Windows native builds, and expanded index types (IVF_PQ, ScaNN). Enables full-time attention to the project.",
+        "amount": 50,
+        "currency": "USD",
+        "frequency": "monthly"
+      }
+    ]
+  }
+}
