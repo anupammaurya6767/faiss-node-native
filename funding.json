@@ -32,7 +32,7 @@
         "guid": "maintenance",
         "name": "Ongoing Maintenance",
         "description": "Covers CI costs for native C++ builds across Linux/macOS, dependency updates, issue triage, and FAISS version compatibility.",
-        "amount": 25,
+        "amount": 50,
         "currency": "USD",
         "frequency": "monthly"
       },
@@ -40,7 +40,7 @@
         "guid": "growth",
         "name": "Feature Development",
         "description": "GPU index support, Windows native builds, and expanded index types (IVF_PQ, ScaNN). Enables full-time attention to the project.",
-        "amount": 50,
+        "amount": 100,
         "currency": "USD",
         "frequency": "monthly"
       }
