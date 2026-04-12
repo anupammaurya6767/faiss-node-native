@@ -500,14 +500,82 @@ FaissIndexWrapperJS::FaissIndexWrapperJS(const Napi::CallbackInfo& info)
         
         // Get index type (default to "FLAT_L2" -> "Flat")
         std::string indexDescription = "Flat";  // Default: IndexFlatL2
+        std::string typeLabel = "FLAT_L2";
         int metric = 1;  // Default: METRIC_L2
         bool isHnsw = false;
         int efConstruction = 200;
         int efSearch = 50;
-        
-        if (config.Has("type") && config.Get("type").IsString()) {
+        std::string factoryDescription;
+
+        auto readPositiveInt = [&](const char* key, int defaultValue) -> int {
+            if (!config.Has(key)) {
+                return defaultValue;
+            }
+
+            if (!config.Get(key).IsNumber()) {
+                throw Napi::TypeError::New(env, std::string("Expected number for ") + key);
+            }
+
+            int value = config.Get(key).As<Napi::Number>().Int32Value();
+            if (value <= 0) {
+                throw Napi::RangeError::New(env, std::string(key) + " must be positive");
+            }
+
+            return value;
+        };
+
+        auto pqDescription = [&](int defaultSegments = 8, int defaultBits = 8) -> std::string {
+            int pqSegments = readPositiveInt("pqSegments", defaultSegments);
+            int pqBits = readPositiveInt("pqBits", defaultBits);
+
+            if (dims_ % pqSegments != 0) {
+                throw Napi::RangeError::New(
+                    env,
+                    "pqSegments must evenly divide dims. Got dims=" +
+                    std::to_string(dims_) + ", pqSegments=" + std::to_string(pqSegments));
+            }
+
+            if (pqBits == 8) {
+                return "PQ" + std::to_string(pqSegments);
+            }
+
+            return "PQ" + std::to_string(pqSegments) + "x" + std::to_string(pqBits);
+        };
+
+        auto metricFromConfig = [&]() -> int {
+            if (!config.Has("metric")) {
+                return metric;
+            }
+
+            if (!config.Get("metric").IsString()) {
+                throw Napi::TypeError::New(env, "Expected string for metric");
+            }
+
+            std::string metricName = config.Get("metric").As<Napi::String>().Utf8Value();
+            if (metricName == "l2") {
+                return 1;
+            }
+
+            if (metricName == "ip") {
+                return 0;
+            }
+
+            throw Napi::TypeError::New(env, "Unsupported metric: " + metricName + ". Supported: l2, ip");
+        };
+
+        if (config.Has("factory")) {
+            if (!config.Get("factory").IsString()) {
+                throw Napi::TypeError::New(env, "Expected string for factory");
+            }
+
+            indexDescription = config.Get("factory").As<Napi::String>().Utf8Value();
+            factoryDescription = indexDescription;
+            typeLabel.clear();
+            metric = metricFromConfig();
+        } else if (config.Has("type") && config.Get("type").IsString()) {
             std::string type = config.Get("type").As<Napi::String>().Utf8Value();
-            
+            typeLabel = type;
+
             if (type == "FLAT_L2") {
                 indexDescription = "Flat";
                 metric = 1;  // METRIC_L2
@@ -515,55 +583,58 @@ FaissIndexWrapperJS::FaissIndexWrapperJS(const Napi::CallbackInfo& info)
                 indexDescription = "Flat";
                 metric = 0;  // METRIC_INNER_PRODUCT
             } else if (type == "IVF_FLAT") {
-                // Build IVF string: "IVF{nlist},Flat"
-                int nlist = 100;  // Default number of clusters
-                if (config.Has("nlist") && config.Get("nlist").IsNumber()) {
-                    nlist = config.Get("nlist").As<Napi::Number>().Int32Value();
-                    if (nlist <= 0) {
-                        throw Napi::RangeError::New(env, "nlist must be positive");
-                    }
-                }
+                int nlist = readPositiveInt("nlist", 100);
                 indexDescription = "IVF" + std::to_string(nlist) + ",Flat";
-                metric = 1;  // METRIC_L2
-            } else if (type == "HNSW") {
-                // Build HNSW string: "HNSW{M}"
-                isHnsw = true;
-                int M = 16;  // Default connections per node
-                if (config.Has("M") && config.Get("M").IsNumber()) {
-                    M = config.Get("M").As<Napi::Number>().Int32Value();
-                    if (M <= 0) {
-                        throw Napi::RangeError::New(env, "M must be positive");
+                metric = metricFromConfig();
+            } else if (type == "PQ") {
+                indexDescription = pqDescription();
+                metric = metricFromConfig();
+            } else if (type == "IVF_PQ") {
+                int nlist = readPositiveInt("nlist", 100);
+                indexDescription = "IVF" + std::to_string(nlist) + "," + pqDescription();
+                metric = metricFromConfig();
+            } else if (type == "IVF_SQ") {
+                int nlist = readPositiveInt("nlist", 100);
+                std::string sqType = "SQ8";
+                if (config.Has("sqType")) {
+                    if (!config.Get("sqType").IsString()) {
+                        throw Napi::TypeError::New(env, "Expected string for sqType");
+                    }
+                    sqType = config.Get("sqType").As<Napi::String>().Utf8Value();
+                    if (sqType.empty()) {
+                        throw Napi::TypeError::New(env, "sqType must be a non-empty string");
                     }
                 }
+                indexDescription = "IVF" + std::to_string(nlist) + "," + sqType;
+                metric = metricFromConfig();
+            } else if (type == "HNSW") {
+                isHnsw = true;
+                int M = readPositiveInt("M", 16);
                 indexDescription = "HNSW" + std::to_string(M);
-                metric = 1;  // METRIC_L2
+                metric = metricFromConfig();
 
                 if (config.Has("efConstruction")) {
-                    if (!config.Get("efConstruction").IsNumber()) {
-                        throw Napi::TypeError::New(env, "Expected number for efConstruction");
-                    }
-                    efConstruction = config.Get("efConstruction").As<Napi::Number>().Int32Value();
-                    if (efConstruction <= 0) {
-                        throw Napi::RangeError::New(env, "efConstruction must be positive");
-                    }
+                    efConstruction = readPositiveInt("efConstruction", efConstruction);
                 }
 
                 if (config.Has("efSearch")) {
-                    if (!config.Get("efSearch").IsNumber()) {
-                        throw Napi::TypeError::New(env, "Expected number for efSearch");
-                    }
-                    efSearch = config.Get("efSearch").As<Napi::Number>().Int32Value();
-                    if (efSearch <= 0) {
-                        throw Napi::RangeError::New(env, "efSearch must be positive");
-                    }
+                    efSearch = readPositiveInt("efSearch", efSearch);
                 }
             } else {
-                throw Napi::TypeError::New(env, "Unsupported index type: " + type + ". Supported: FLAT_L2, FLAT_IP, IVF_FLAT, HNSW");
+                throw Napi::TypeError::New(
+                    env,
+                    "Unsupported index type: " + type +
+                    ". Supported: FLAT_L2, FLAT_IP, IVF_FLAT, HNSW, PQ, IVF_PQ, IVF_SQ");
             }
         }
-        
+
         // Create the C++ wrapper with index_factory
-        wrapper_ = std::make_unique<FaissIndexWrapper>(dims_, indexDescription, metric);
+        wrapper_ = std::make_unique<FaissIndexWrapper>(
+            dims_,
+            indexDescription,
+            metric,
+            typeLabel,
+            factoryDescription);
 
         if (isHnsw) {
             wrapper_->SetHnswParams(efConstruction, efSearch);
@@ -918,6 +989,8 @@ Napi::Value FaissIndexWrapperJS::GetStats(const Napi::CallbackInfo& info) {
         stats.Set("dims", Napi::Number::New(env, wrapper_->GetDimensions()));
         stats.Set("isTrained", Napi::Boolean::New(env, wrapper_->IsTrained()));
         stats.Set("type", Napi::String::New(env, wrapper_->GetIndexType()));
+        stats.Set("factory", Napi::String::New(env, wrapper_->GetFactoryDescription()));
+        stats.Set("metric", Napi::String::New(env, wrapper_->GetMetricName()));
         
         return stats;
         

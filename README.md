@@ -12,7 +12,7 @@ High-performance Node.js native bindings for [Facebook FAISS](https://github.com
 
 - 🚀 **Async Operations** - Non-blocking Promise-based API that never blocks the event loop
 - 🔒 **Thread-Safe** - Mutex-protected concurrent operations for production workloads
-- 📦 **Multiple Index Types** - FLAT_L2, FLAT_IP (cosine similarity), IVF_FLAT, and HNSW with optimized defaults
+- 📦 **Multiple Index Types** - FLAT_L2, FLAT_IP, IVF_FLAT, HNSW, PQ, IVF_PQ, IVF_SQ, plus raw FAISS factory strings for advanced pipelines
 - 💾 **Persistence** - Save/load indexes to disk or serialize to buffers
 - ⚡ **High Performance** - Direct C++ bindings with zero-copy data transfer
 - 📚 **TypeScript Support** - Full type definitions included
@@ -111,15 +111,20 @@ const index = new FaissIndex(config);
 ```
 
 **Parameters:**
-- `config.type` (string, optional): Index type - `'FLAT_L2'`, `'FLAT_IP'`, `'IVF_FLAT'`, or `'HNSW'` (default: `'FLAT_L2'`)
+- `config.type` (string, optional): Index type - `'FLAT_L2'`, `'FLAT_IP'`, `'IVF_FLAT'`, `'HNSW'`, `'PQ'`, `'IVF_PQ'`, or `'IVF_SQ'` (default: `'FLAT_L2'`)
+- `config.factory` (string, optional): Raw FAISS factory string for advanced pipelines such as OPQ, PCA, or PCAR
 - `config.dims` (number, required): Vector dimensions (must be positive integer)
-- `config.nlist` (number, optional): Number of clusters for IVF_FLAT (default: 100)
-- `config.nprobe` (number, optional): Clusters to search for IVF_FLAT (default: 10)
+- `config.metric` (string, optional): Distance metric - `'l2'` or `'ip'` for compatible index types and raw factory indexes
+- `config.nlist` (number, optional): Number of clusters for IVF_FLAT, IVF_PQ, or IVF_SQ (default: 100)
+- `config.nprobe` (number, optional): Clusters to search for IVF_FLAT, IVF_PQ, or IVF_SQ (default: 10)
 - `config.M` (number, optional): Connections per node for HNSW (default: 16)
 - `config.efConstruction` (number, optional): HNSW construction parameter (default: 200)
 - `config.efSearch` (number, optional): HNSW search parameter (default: 50)
+- `config.pqSegments` (number, optional): Number of PQ subquantizers for PQ and IVF_PQ
+- `config.pqBits` (number, optional): Bits per PQ code for PQ and IVF_PQ (default: 8)
+- `config.sqType` (string, optional): Scalar quantizer type for IVF_SQ (default: `'SQ8'`)
 
-Use `nlist` and `nprobe` only with `IVF_FLAT`, and use `M`, `efConstruction`, and `efSearch` only with `HNSW`.
+Use `nlist` and `nprobe` only with `IVF_FLAT`, `IVF_PQ`, or `IVF_SQ`. Use `pqSegments` and `pqBits` only with `PQ` or `IVF_PQ`. Use `M`, `efConstruction`, and `efSearch` only with `HNSW`. Use `factory` by itself for advanced FAISS pipelines, because the topology is encoded directly in the factory string.
 
 **Examples:**
 
@@ -141,6 +146,36 @@ const ivfIndex = new FaissIndex({
 });
 await ivfIndex.train(trainingVectors);  // Must train before adding vectors!
 
+// PQ - Memory efficient quantization without IVF
+const pqIndex = new FaissIndex({
+  type: 'PQ',
+  dims: 768,
+  pqSegments: 48,
+  pqBits: 8
+});
+await pqIndex.train(trainingVectors);
+
+// IVF_PQ - IVF coarse quantization plus PQ compression
+const ivfPqIndex = new FaissIndex({
+  type: 'IVF_PQ',
+  dims: 768,
+  nlist: 100,
+  nprobe: 10,
+  pqSegments: 48,
+  pqBits: 8
+});
+await ivfPqIndex.train(trainingVectors);
+
+// IVF_SQ - IVF with scalar quantization
+const ivfSqIndex = new FaissIndex({
+  type: 'IVF_SQ',
+  dims: 768,
+  nlist: 100,
+  nprobe: 10,
+  sqType: 'SQ8'
+});
+await ivfSqIndex.train(trainingVectors);
+
 // HNSW - State-of-the-art approximate search (best for large datasets)
 const hnswIndex = new FaissIndex({ 
   type: 'HNSW', 
@@ -149,6 +184,18 @@ const hnswIndex = new FaissIndex({
   efConstruction: 200, // Construction parameter
   efSearch: 50        // Search parameter (higher = more accurate, slower)
 });
+
+// Advanced factory string - unlock FAISS preprocessing pipelines
+const customIndex = new FaissIndex({
+  dims: 768,
+  factory: 'PCA256,Flat',
+  metric: 'l2'
+});
+await customIndex.train(trainingVectors);
+
+// You can also pass OPQ / PCAR pipelines directly:
+// 'OPQ48_192,IVF100,PQ48'
+// 'PCAR256,IVF100,PQ48'
 ```
 
 ### Methods

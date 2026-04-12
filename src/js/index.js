@@ -18,14 +18,70 @@ function validatePositiveInteger(name, value) {
     }
 }
 
+function validateNonEmptyString(name, value) {
+    if (typeof value !== 'string' || value.trim().length === 0) {
+        throw new TypeError(`${name} must be a non-empty string`);
+    }
+}
+
+const VALID_TYPES = ['FLAT_L2', 'FLAT_IP', 'IVF_FLAT', 'HNSW', 'PQ', 'IVF_PQ', 'IVF_SQ'];
+const IVF_TYPES = new Set(['IVF_FLAT', 'IVF_PQ', 'IVF_SQ']);
+const PQ_TYPES = new Set(['PQ', 'IVF_PQ']);
+const VALID_METRICS = new Set(['l2', 'ip']);
+
+function validateMetric(type, metric) {
+    if (metric === undefined) {
+        return;
+    }
+
+    if (!VALID_METRICS.has(metric)) {
+        throw new TypeError(`metric must be one of: ${Array.from(VALID_METRICS).join(', ')}`);
+    }
+
+    if (type === 'FLAT_L2' && metric !== 'l2') {
+        throw new TypeError('FLAT_L2 indexes only support metric "l2"');
+    }
+
+    if (type === 'FLAT_IP' && metric !== 'ip') {
+        throw new TypeError('FLAT_IP indexes only support metric "ip"');
+    }
+}
+
+function validateFactoryConfig(config) {
+    validateNonEmptyString('factory', config.factory);
+    validateMetric(undefined, config.metric);
+
+    if (config.type !== undefined) {
+        throw new TypeError('type cannot be combined with factory; use one or the other');
+    }
+
+    const factoryEncodedOptions = ['nlist', 'M', 'efConstruction', 'efSearch', 'pqSegments', 'pqBits', 'sqType'];
+    for (const key of factoryEncodedOptions) {
+        if (config[key] !== undefined) {
+            throw new TypeError(`${key} cannot be combined with factory; encode it directly in the factory string`);
+        }
+    }
+
+    if (config.nprobe !== undefined) {
+        validatePositiveInteger('nprobe', config.nprobe);
+    }
+}
+
 function validateIndexSpecificOptions(type, config) {
+    if (!VALID_TYPES.includes(type)) {
+        throw new Error(`Index type '${type}' not supported. Supported types: ${VALID_TYPES.join(', ')}`);
+    }
+
+    validateMetric(type, config.metric);
+
     const ivfOnlyOptions = ['nlist', 'nprobe'];
     const hnswOnlyOptions = ['M', 'efConstruction', 'efSearch'];
+    const pqOnlyOptions = ['pqSegments', 'pqBits'];
 
-    if (type !== 'IVF_FLAT') {
+    if (!IVF_TYPES.has(type)) {
         for (const key of ivfOnlyOptions) {
             if (config[key] !== undefined) {
-                throw new TypeError(`${key} is only supported for IVF_FLAT indexes`);
+                throw new TypeError(`${key} is only supported for IVF_FLAT, IVF_PQ, and IVF_SQ indexes`);
             }
         }
     }
@@ -37,6 +93,58 @@ function validateIndexSpecificOptions(type, config) {
             }
         }
     }
+
+    if (!PQ_TYPES.has(type)) {
+        for (const key of pqOnlyOptions) {
+            if (config[key] !== undefined) {
+                throw new TypeError(`${key} is only supported for PQ and IVF_PQ indexes`);
+            }
+        }
+    }
+
+    if (type !== 'IVF_SQ' && config.sqType !== undefined) {
+        throw new TypeError('sqType is only supported for IVF_SQ indexes');
+    }
+
+    for (const key of ['nlist', 'nprobe', 'M', 'efConstruction', 'efSearch', 'pqSegments', 'pqBits']) {
+        if (config[key] !== undefined) {
+            validatePositiveInteger(key, config[key]);
+        }
+    }
+
+    if (config.pqSegments !== undefined && config.dims % config.pqSegments !== 0) {
+        throw new RangeError(
+            `pqSegments must evenly divide dims. Got dims=${config.dims}, pqSegments=${config.pqSegments}`
+        );
+    }
+
+    if (config.sqType !== undefined) {
+        validateNonEmptyString('sqType', config.sqType);
+    }
+}
+
+function buildNativeConfig(config, indexType) {
+    const nativeConfig = { dims: config.dims };
+
+    if (config.factory !== undefined) {
+        nativeConfig.factory = config.factory;
+        if (config.metric !== undefined) {
+            nativeConfig.metric = config.metric;
+        }
+        if (config.nprobe !== undefined) {
+            nativeConfig.nprobe = config.nprobe;
+        }
+        return nativeConfig;
+    }
+
+    nativeConfig.type = indexType;
+    for (const key of ['nlist', 'nprobe', 'M', 'efConstruction', 'efSearch', 'pqSegments', 'pqBits', 'sqType', 'metric']) {
+        if (config[key] !== undefined) {
+            nativeConfig[key] = config[key];
+        }
+    }
+
+    return nativeConfig;
 }
 
 /**
@@ -51,55 +159,35 @@ class FaissIndex {
     /**
      * Create a new FAISS index
      * @param {Object} config - Configuration object
-     * @param {string} config.type - Index type ('FLAT_L2', 'FLAT_IP', 'IVF_FLAT', or 'HNSW')
+     * @param {string} [config.type] - Index type ('FLAT_L2', 'FLAT_IP', 'IVF_FLAT', 'HNSW', 'PQ', 'IVF_PQ', or 'IVF_SQ')
+     * @param {string} [config.factory] - Raw FAISS factory string for advanced pipelines
      * @param {number} config.dims - Vector dimensions (required)
      */
     constructor(config) {
         if (!config || typeof config !== 'object') {
             throw new TypeError('Expected config object');
         }
-        
-        const validTypes = ['FLAT_L2', 'FLAT_IP', 'IVF_FLAT', 'HNSW'];
-        if (config.type && !validTypes.includes(config.type)) {
-            throw new Error(`Index type '${config.type}' not supported. Supported types: ${validTypes.join(', ')}`);
-        }
 
-        const indexType = config.type || 'FLAT_L2';
-        
         if (!Number.isInteger(config.dims) || config.dims <= 0) {
             throw new TypeError('dims must be a positive integer');
         }
 
-        validateIndexSpecificOptions(indexType, config);
+        const indexType = config.factory !== undefined ? null : (config.type || 'FLAT_L2');
 
-        for (const key of ['nlist', 'nprobe', 'M', 'efConstruction', 'efSearch']) {
-            if (config[key] !== undefined) {
-                validatePositiveInteger(key, config[key]);
-            }
+        if (config.factory !== undefined) {
+            validateFactoryConfig(config);
+        } else {
+            validateIndexSpecificOptions(indexType, config);
         }
-        
-        // Build config object for native wrapper
-        const nativeConfig = { dims: config.dims };
-        nativeConfig.type = indexType;
-        if (config.nlist !== undefined) {
-            nativeConfig.nlist = config.nlist;
-        }
-        if (config.nprobe !== undefined) {
-            nativeConfig.nprobe = config.nprobe;
-        }
-        if (config.M !== undefined) {
-            nativeConfig.M = config.M;
-        }
-        if (config.efConstruction !== undefined) {
-            nativeConfig.efConstruction = config.efConstruction;
-        }
-        if (config.efSearch !== undefined) {
-            nativeConfig.efSearch = config.efSearch;
-        }
+
+        const nativeConfig = buildNativeConfig(config, indexType);
         
         this._native = new FaissIndexWrapper(nativeConfig);
-        this._dims = config.dims;
-        this._type = indexType;
+        const stats = this._native.getStats();
+        this._dims = stats.dims;
+        this._type = stats.type;
+        this._factory = stats.factory || null;
+        this._metric = stats.metric;
     }
 
     _ensureActive() {
@@ -414,6 +502,8 @@ class FaissIndex {
             index._native = native;
             index._dims = stats.dims;
             index._type = stats.type;
+            index._factory = stats.factory || null;
+            index._metric = stats.metric;
             return index;
         } catch (error) {
             throw new Error(`Failed to load index: ${error.message}`);
@@ -437,6 +527,8 @@ class FaissIndex {
             index._native = native;
             index._dims = stats.dims;
             index._type = stats.type;
+            index._factory = stats.factory || null;
+            index._metric = stats.metric;
             return index;
         } catch (error) {
             throw new Error(`Failed to deserialize index: ${error.message}`);

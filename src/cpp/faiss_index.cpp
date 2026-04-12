@@ -6,6 +6,11 @@
 #include <faiss/IndexFlat.h>
 #include <faiss/IndexHNSW.h>
 #include <faiss/IndexIVF.h>
+#include <faiss/IndexIVFPQ.h>
+#include <faiss/IndexPQ.h>
+#include <faiss/IndexPreTransform.h>
+#include <faiss/IndexScalarQuantizer.h>
+#include <faiss/VectorTransform.h>
 #include <faiss/index_factory.h>
 #include <faiss/index_io.h>
 #include <faiss/impl/io.h>
@@ -19,8 +24,95 @@
 #include "faiss_index.h"
 #include <stdexcept>
 
-FaissIndexWrapper::FaissIndexWrapper(int dims, const std::string& indexDescription, int metric) 
-    : dims_(dims), disposed_(false) {
+namespace {
+
+std::string MetricToString(faiss::MetricType metric) {
+    return metric == faiss::METRIC_INNER_PRODUCT ? "ip" : "l2";
+}
+
+std::string InferTransformLabel(const faiss::IndexPreTransform* pretransform) {
+    if (pretransform == nullptr) {
+        return "";
+    }
+
+    for (const auto* transform : pretransform->chain) {
+        if (dynamic_cast<const faiss::OPQMatrix*>(transform) != nullptr) {
+            return "OPQ";
+        }
+
+        const auto* pca = dynamic_cast<const faiss::PCAMatrix*>(transform);
+        if (pca != nullptr) {
+            return pca->random_rotation ? "PCAR" : "PCA";
+        }
+    }
+
+    return "PRETRANSFORM";
+}
+
+std::string InferIndexType(const faiss::Index* index) {
+    if (index == nullptr) {
+        return "UNKNOWN";
+    }
+
+    const auto* pretransform = dynamic_cast<const faiss::IndexPreTransform*>(index);
+    if (pretransform != nullptr) {
+        const std::string transformLabel = InferTransformLabel(pretransform);
+        const std::string innerLabel = InferIndexType(pretransform->index);
+
+        if (transformLabel.empty()) {
+            return innerLabel;
+        }
+
+        if (innerLabel.empty() || innerLabel == "UNKNOWN" || innerLabel == "CUSTOM") {
+            return transformLabel;
+        }
+
+        return transformLabel + "_" + innerLabel;
+    }
+
+    if (dynamic_cast<const faiss::IndexIVFPQ*>(index) != nullptr) {
+        return "IVF_PQ";
+    }
+
+    if (dynamic_cast<const faiss::IndexIVFScalarQuantizer*>(index) != nullptr) {
+        return "IVF_SQ";
+    }
+
+    if (dynamic_cast<const faiss::IndexPQ*>(index) != nullptr) {
+        return "PQ";
+    }
+
+    if (dynamic_cast<const faiss::IndexScalarQuantizer*>(index) != nullptr) {
+        return "SQ";
+    }
+
+    if (dynamic_cast<const faiss::IndexHNSW*>(index) != nullptr) {
+        return "HNSW";
+    }
+
+    if (dynamic_cast<const faiss::IndexIVF*>(index) != nullptr) {
+        return "IVF_FLAT";
+    }
+
+    if (dynamic_cast<const faiss::IndexFlat*>(index) != nullptr) {
+        return index->metric_type == faiss::METRIC_INNER_PRODUCT ? "FLAT_IP" : "FLAT_L2";
+    }
+
+    return "CUSTOM";
+}
+
+}  // namespace
+
+FaissIndexWrapper::FaissIndexWrapper(
+        int dims,
+        const std::string& indexDescription,
+        int metric,
+        const std::string& typeLabel,
+        const std::string& factoryDescription)
+    : dims_(dims),
+      disposed_(false),
+      type_label_(typeLabel),
+      factory_description_(factoryDescription.empty() ? indexDescription : factoryDescription) {
     if (dims <= 0) {
         throw std::invalid_argument("Dimensions must be positive");
     }
@@ -29,6 +121,10 @@ FaissIndexWrapper::FaissIndexWrapper(int dims, const std::string& indexDescripti
     // Examples: "Flat" -> IndexFlatL2, "IVF100,Flat" -> IndexIVFFlat, "HNSW32" -> IndexHNSW
     faiss::MetricType metricType = static_cast<faiss::MetricType>(metric);
     index_ = std::unique_ptr<faiss::Index>(faiss::index_factory(dims, indexDescription.c_str(), metricType));
+
+    if (type_label_.empty()) {
+        type_label_ = InferIndexType(index_.get());
+    }
 }
 
 FaissIndexWrapper::FaissIndexWrapper(int dims) 
@@ -189,20 +285,23 @@ std::string FaissIndexWrapper::GetIndexType() const {
     if (disposed_) {
         return "UNKNOWN";
     }
+    return type_label_.empty() ? InferIndexType(index_.get()) : type_label_;
+}
 
-    if (dynamic_cast<faiss::IndexHNSW*>(index_.get()) != nullptr) {
-        return "HNSW";
+std::string FaissIndexWrapper::GetFactoryDescription() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (disposed_) {
+        return "";
     }
+    return factory_description_;
+}
 
-    if (dynamic_cast<faiss::IndexIVF*>(index_.get()) != nullptr) {
-        return "IVF_FLAT";
+std::string FaissIndexWrapper::GetMetricName() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (disposed_) {
+        return "l2";
     }
-
-    if (dynamic_cast<faiss::IndexFlat*>(index_.get()) != nullptr) {
-        return index_->metric_type == faiss::METRIC_INNER_PRODUCT ? "FLAT_IP" : "FLAT_L2";
-    }
-
-    return "UNKNOWN";
+    return MetricToString(index_->metric_type);
 }
 
 void FaissIndexWrapper::Dispose() {
@@ -244,6 +343,8 @@ std::unique_ptr<FaissIndexWrapper> FaissIndexWrapper::Load(const std::string& fi
         auto wrapper = std::make_unique<FaissIndexWrapper>(loaded_index->d);
         wrapper->index_.reset(loaded_index);
         wrapper->dims_ = loaded_index->d;
+        wrapper->type_label_ = InferIndexType(loaded_index);
+        wrapper->factory_description_.clear();
         
         return wrapper;
     } catch (const std::exception& e) {
@@ -287,6 +388,8 @@ std::unique_ptr<FaissIndexWrapper> FaissIndexWrapper::FromBuffer(const uint8_t* 
         auto wrapper = std::make_unique<FaissIndexWrapper>(loaded_index->d);
         wrapper->index_.reset(loaded_index);
         wrapper->dims_ = loaded_index->d;
+        wrapper->type_label_ = InferIndexType(loaded_index);
+        wrapper->factory_description_.clear();
         
         return wrapper;
     } catch (const std::exception& e) {

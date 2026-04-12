@@ -1,0 +1,79 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '20 4 * * 1'
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+            build-mode: none
+          - language: c-cpp
+            build-mode: manual
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        if: matrix.language == 'c-cpp'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Install native dependencies
+        if: matrix.language == 'c-cpp'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake libopenblas-dev libomp-dev build-essential
+          git clone https://github.com/facebookresearch/faiss.git /tmp/faiss
+          cd /tmp/faiss
+          cmake -B build \
+            -DFAISS_ENABLE_GPU=OFF \
+            -DFAISS_ENABLE_PYTHON=OFF \
+            -DBUILD_TESTING=OFF \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DCMAKE_CXX_FLAGS="-fopenmp" \
+            -DCMAKE_C_FLAGS="-fopenmp"
+          cmake --build build -j"$(nproc)"
+          sudo cmake --install build
+          sudo ldconfig
+
+      - name: Install npm dependencies
+        if: matrix.language == 'c-cpp'
+        run: npm ci --ignore-scripts
+
+      - name: Build native addon
+        if: matrix.language == 'c-cpp'
+        run: |
+          export CPPFLAGS="-I/usr/local/include"
+          export CXXFLAGS="-I/usr/local/include"
+          export LDFLAGS="-L/usr/local/lib"
+          npm run build
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}

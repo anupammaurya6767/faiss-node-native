@@ -3,7 +3,8 @@
  */
 
 export interface FaissIndexConfig {
-  type?: 'FLAT_L2' | 'FLAT_IP' | 'IVF_FLAT' | 'HNSW';
+  type?: 'FLAT_L2' | 'FLAT_IP' | 'IVF_FLAT' | 'HNSW' | 'PQ' | 'IVF_PQ' | 'IVF_SQ';
+  factory?: string;
   dims: number;
   nlist?: number;
   nprobe?: number;
@@ -11,6 +12,9 @@ export interface FaissIndexConfig {
   efConstruction?: number;
   efSearch?: number;
   metric?: 'l2' | 'ip';
+  pqSegments?: number;
+  pqBits?: number;
+  sqType?: string;
   threads?: number;
 }
 
@@ -36,6 +40,8 @@ export interface IndexStats {
   dims: number;
   isTrained: boolean;
   type: string;
+  factory: string;
+  metric: 'l2' | 'ip';
 }
 
 export declare class FaissIndex {

@@ -21,7 +21,12 @@ class FaissIndexWrapper {
 public:
     // Constructor: creates index using index_factory string
     // Examples: "Flat" for IndexFlatL2, "IVF100,Flat" for IndexIVFFlat, "HNSW32" for IndexHNSW
-    FaissIndexWrapper(int dims, const std::string& indexDescription, int metric = 1);
+    FaissIndexWrapper(
+        int dims,
+        const std::string& indexDescription,
+        int metric = 1,
+        const std::string& typeLabel = "",
+        const std::string& factoryDescription = "");
     
     // Constructor: creates IndexFlatL2 (for backward compatibility)
     explicit FaissIndexWrapper(int dims);
@@ -61,6 +66,8 @@ public:
     int GetDimensions() const;
     bool IsTrained() const;
     std::string GetIndexType() const;
+    std::string GetFactoryDescription() const;
+    std::string GetMetricName() const;
     
     // Set nprobe for IVF indexes
     void SetNprobe(int nprobe);
@@ -112,6 +119,8 @@ private:
     std::unique_ptr<faiss::Index> index_;  // Base Index pointer (can hold any index type)
     int dims_;
     bool disposed_;
+    std::string type_label_;
+    std::string factory_description_;
     mutable std::mutex mutex_;  // Protect concurrent access
 };
 
