@@ -46,11 +46,8 @@
             "-L/usr/local/opt/faiss/lib",
             "-L/opt/homebrew/opt/openblas/lib",
             "-L/usr/local/opt/openblas/lib",
-            "-L/opt/homebrew/opt/libomp/lib",
-            "-L/usr/local/opt/libomp/lib",
             "-lfaiss",
             "-lopenblas",
-            "-lomp"
           ],
           "ldflags": [
             "-L/opt/homebrew/lib",
@@ -59,14 +56,10 @@
             "-L/usr/local/opt/faiss/lib",
             "-L/opt/homebrew/opt/openblas/lib",
             "-L/usr/local/opt/openblas/lib",
-            "-L/opt/homebrew/opt/libomp/lib",
-            "-L/usr/local/opt/libomp/lib",
             "-Wl,-rpath,/opt/homebrew/opt/faiss/lib",
             "-Wl,-rpath,/usr/local/opt/faiss/lib",
             "-Wl,-rpath,/opt/homebrew/opt/openblas/lib",
             "-Wl,-rpath,/usr/local/opt/openblas/lib",
-            "-Wl,-rpath,/opt/homebrew/opt/libomp/lib",
-            "-Wl,-rpath,/usr/local/opt/libomp/lib",
             "-headerpad_max_install_names"
           ]
         }],
