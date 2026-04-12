@@ -60,9 +60,13 @@ public:
     size_t GetTotalVectors() const;
     int GetDimensions() const;
     bool IsTrained() const;
+    std::string GetIndexType() const;
     
     // Set nprobe for IVF indexes
     void SetNprobe(int nprobe);
+    
+    // Configure HNSW-specific parameters after index construction
+    void SetHnswParams(int efConstruction, int efSearch);
     
     // Dispose: explicitly free resources
     void Dispose();

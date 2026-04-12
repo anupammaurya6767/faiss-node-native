@@ -501,6 +501,9 @@ FaissIndexWrapperJS::FaissIndexWrapperJS(const Napi::CallbackInfo& info)
         // Get index type (default to "FLAT_L2" -> "Flat")
         std::string indexDescription = "Flat";  // Default: IndexFlatL2
         int metric = 1;  // Default: METRIC_L2
+        bool isHnsw = false;
+        int efConstruction = 0;
+        int efSearch = 0;
         
         if (config.Has("type") && config.Get("type").IsString()) {
             std::string type = config.Get("type").As<Napi::String>().Utf8Value();
@@ -516,17 +519,44 @@ FaissIndexWrapperJS::FaissIndexWrapperJS(const Napi::CallbackInfo& info)
                 int nlist = 100;  // Default number of clusters
                 if (config.Has("nlist") && config.Get("nlist").IsNumber()) {
                     nlist = config.Get("nlist").As<Napi::Number>().Int32Value();
+                    if (nlist <= 0) {
+                        throw Napi::RangeError::New(env, "nlist must be positive");
+                    }
                 }
                 indexDescription = "IVF" + std::to_string(nlist) + ",Flat";
                 metric = 1;  // METRIC_L2
             } else if (type == "HNSW") {
                 // Build HNSW string: "HNSW{M}"
+                isHnsw = true;
                 int M = 16;  // Default connections per node
                 if (config.Has("M") && config.Get("M").IsNumber()) {
                     M = config.Get("M").As<Napi::Number>().Int32Value();
+                    if (M <= 0) {
+                        throw Napi::RangeError::New(env, "M must be positive");
+                    }
                 }
                 indexDescription = "HNSW" + std::to_string(M);
                 metric = 1;  // METRIC_L2
+
+                if (config.Has("efConstruction")) {
+                    if (!config.Get("efConstruction").IsNumber()) {
+                        throw Napi::TypeError::New(env, "Expected number for efConstruction");
+                    }
+                    efConstruction = config.Get("efConstruction").As<Napi::Number>().Int32Value();
+                    if (efConstruction <= 0) {
+                        throw Napi::RangeError::New(env, "efConstruction must be positive");
+                    }
+                }
+
+                if (config.Has("efSearch")) {
+                    if (!config.Get("efSearch").IsNumber()) {
+                        throw Napi::TypeError::New(env, "Expected number for efSearch");
+                    }
+                    efSearch = config.Get("efSearch").As<Napi::Number>().Int32Value();
+                    if (efSearch <= 0) {
+                        throw Napi::RangeError::New(env, "efSearch must be positive");
+                    }
+                }
             } else {
                 throw Napi::TypeError::New(env, "Unsupported index type: " + type + ". Supported: FLAT_L2, FLAT_IP, IVF_FLAT, HNSW");
             }
@@ -534,10 +564,17 @@ FaissIndexWrapperJS::FaissIndexWrapperJS(const Napi::CallbackInfo& info)
         
         // Create the C++ wrapper with index_factory
         wrapper_ = std::make_unique<FaissIndexWrapper>(dims_, indexDescription, metric);
+
+        if (isHnsw) {
+            wrapper_->SetHnswParams(efConstruction, efSearch);
+        }
         
         // Set nprobe for IVF indexes
         if (config.Has("nprobe") && config.Get("nprobe").IsNumber()) {
             int nprobe = config.Get("nprobe").As<Napi::Number>().Int32Value();
+            if (nprobe <= 0) {
+                throw Napi::RangeError::New(env, "nprobe must be positive");
+            }
             wrapper_->SetNprobe(nprobe);
         }
         
@@ -880,7 +917,7 @@ Napi::Value FaissIndexWrapperJS::GetStats(const Napi::CallbackInfo& info) {
         stats.Set("ntotal", Napi::Number::New(env, wrapper_->GetTotalVectors()));
         stats.Set("dims", Napi::Number::New(env, wrapper_->GetDimensions()));
         stats.Set("isTrained", Napi::Boolean::New(env, wrapper_->IsTrained()));
-        stats.Set("type", Napi::String::New(env, "FLAT_L2"));
+        stats.Set("type", Napi::String::New(env, wrapper_->GetIndexType()));
         
         return stats;
         

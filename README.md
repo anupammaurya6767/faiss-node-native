@@ -256,12 +256,12 @@ await ivfIndex.train(trainingVectors);
 await ivfIndex.add(dataVectors);  // Now you can add vectors
 ```
 
-#### `setNprobe(nprobe: number): Promise<void>`
+#### `setNprobe(nprobe: number): void`
 
 Set the number of clusters to search for IVF_FLAT indexes.
 
 ```javascript
-await ivfIndex.setNprobe(20);  // Search more clusters (more accurate, slower)
+ivfIndex.setNprobe(20);  // Search more clusters (more accurate, slower)
 ```
 
 #### `getStats(): IndexStats`
@@ -313,7 +313,7 @@ const index = await FaissIndex.fromBuffer(buffer);
 
 #### `mergeFrom(otherIndex: FaissIndex): Promise<void>`
 
-Merge vectors from another index into this index.
+Transfer vectors from another index into this index.
 
 ```javascript
 const index1 = new FaissIndex({ type: 'FLAT_L2', dims: 128 });
@@ -323,7 +323,7 @@ await index1.add(vectors1);
 await index2.add(vectors2);
 
 await index1.mergeFrom(index2);  // index1 now contains vectors from both
-// Note: index2 is now empty (FAISS behavior)
+// Note: index2 is now empty after the transfer (FAISS behavior)
 ```
 
 #### `dispose(): void`
@@ -928,4 +928,3 @@ MIT License - see [LICENSE](./LICENSE) file for details.
 ---
 
 Made with ❤️ for the Node.js community
-

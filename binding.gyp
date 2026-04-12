@@ -12,7 +12,13 @@
         "<!@(node -p \"require('node-addon-api').include\")",
         "src/cpp",
         "/opt/homebrew/include",
+        "/opt/homebrew/opt/faiss/include",
+        "/opt/homebrew/opt/openblas/include",
+        "/opt/homebrew/opt/libomp/include",
         "/usr/local/include",
+        "/usr/local/opt/faiss/include",
+        "/usr/local/opt/openblas/include",
+        "/usr/local/opt/libomp/include",
         "/usr/include"
       ],
       "defines": [
@@ -36,9 +42,12 @@
           "libraries": [
             "-L/opt/homebrew/lib",
             "-L/usr/local/lib",
+            "-L/opt/homebrew/opt/faiss/lib",
+            "-L/usr/local/opt/faiss/lib",
+            "-L/opt/homebrew/opt/openblas/lib",
+            "-L/usr/local/opt/openblas/lib",
             "-L/opt/homebrew/opt/libomp/lib",
             "-L/usr/local/opt/libomp/lib",
-            "-L/opt/homebrew/Cellar/openblas/0.3.30/lib",
             "-lfaiss",
             "-lopenblas",
             "-lomp"
@@ -46,9 +55,18 @@
           "ldflags": [
             "-L/opt/homebrew/lib",
             "-L/usr/local/lib",
+            "-L/opt/homebrew/opt/faiss/lib",
+            "-L/usr/local/opt/faiss/lib",
+            "-L/opt/homebrew/opt/openblas/lib",
+            "-L/usr/local/opt/openblas/lib",
             "-L/opt/homebrew/opt/libomp/lib",
             "-L/usr/local/opt/libomp/lib",
-            "-L/opt/homebrew/Cellar/openblas/0.3.30/lib",
+            "-Wl,-rpath,/opt/homebrew/opt/faiss/lib",
+            "-Wl,-rpath,/usr/local/opt/faiss/lib",
+            "-Wl,-rpath,/opt/homebrew/opt/openblas/lib",
+            "-Wl,-rpath,/usr/local/opt/openblas/lib",
+            "-Wl,-rpath,/opt/homebrew/opt/libomp/lib",
+            "-Wl,-rpath,/usr/local/opt/libomp/lib",
             "-headerpad_max_install_names"
           ]
         }],

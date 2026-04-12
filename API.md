@@ -229,7 +229,7 @@ await ivfIndex.add(dataVectors);  // Now you can add vectors
 - `Error` if index is not IVF_FLAT
 - `Error` if index is disposed
 
-### setNprobe(nprobe: number): Promise<void>
+### setNprobe(nprobe: number): void
 
 Set the number of clusters to search for IVF_FLAT indexes.
 
@@ -239,7 +239,7 @@ Set the number of clusters to search for IVF_FLAT indexes.
 **Example:**
 
 ```javascript
-await ivfIndex.setNprobe(20);  // Search more clusters
+ivfIndex.setNprobe(20);  // Search more clusters
 ```
 
 **Throws:**
@@ -339,7 +339,7 @@ const index = await FaissIndex.fromBuffer(buffer);
 
 ### mergeFrom(otherIndex: FaissIndex): Promise<void>
 
-Merge vectors from another index into this index.
+Transfer vectors from another index into this index.
 
 **Parameters:**
 - `otherIndex` (FaissIndex): Index to merge from
@@ -354,7 +354,7 @@ await index1.add(vectors1);
 await index2.add(vectors2);
 
 await index1.mergeFrom(index2);  // index1 now contains vectors from both
-// Note: index2 is now empty (FAISS behavior)
+// Note: index2 is now empty after the transfer (FAISS behavior)
 ```
 
 **Throws:**

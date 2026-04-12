@@ -12,6 +12,12 @@ try {
   }
 }
 
+function validatePositiveInteger(name, value) {
+    if (!Number.isInteger(value) || value <= 0) {
+        throw new TypeError(`${name} must be a positive integer`);
+    }
+}
+
 /**
  * FaissIndex - High-level JavaScript API for FAISS vector similarity search
  * 
@@ -41,6 +47,12 @@ class FaissIndex {
         if (!Number.isInteger(config.dims) || config.dims <= 0) {
             throw new TypeError('dims must be a positive integer');
         }
+
+        for (const key of ['nlist', 'nprobe', 'M', 'efConstruction', 'efSearch']) {
+            if (config[key] !== undefined) {
+                validatePositiveInteger(key, config[key]);
+            }
+        }
         
         // Build config object for native wrapper
         const nativeConfig = { dims: config.dims };
@@ -56,10 +68,22 @@ class FaissIndex {
         if (config.M !== undefined) {
             nativeConfig.M = config.M;
         }
+        if (config.efConstruction !== undefined) {
+            nativeConfig.efConstruction = config.efConstruction;
+        }
+        if (config.efSearch !== undefined) {
+            nativeConfig.efSearch = config.efSearch;
+        }
         
         this._native = new FaissIndexWrapper(nativeConfig);
         this._dims = config.dims;
         this._type = config.type || 'FLAT_L2';
+    }
+
+    _ensureActive() {
+        if (!this._native) {
+            throw new Error('Index has been disposed');
+        }
     }
     
     /**
@@ -69,6 +93,8 @@ class FaissIndex {
      * @returns {Promise<void>}
      */
     async add(vectors, ids) {
+        this._ensureActive();
+
         if (!(vectors instanceof Float32Array)) {
             throw new TypeError('vectors must be a Float32Array');
         }
@@ -97,6 +123,8 @@ class FaissIndex {
      * @returns {Promise<void>}
      */
     async train(vectors) {
+        this._ensureActive();
+
         if (!(vectors instanceof Float32Array)) {
             throw new TypeError('vectors must be a Float32Array');
         }
@@ -111,10 +139,6 @@ class FaissIndex {
             );
         }
         
-        if (!this._native) {
-            throw new Error('Index has been disposed');
-        }
-        
         try {
             await this._native.train(vectors);
         } catch (error) {
@@ -127,13 +151,8 @@ class FaissIndex {
      * @param {number} nprobe - Number of clusters to probe
      */
     setNprobe(nprobe) {
-        if (!Number.isInteger(nprobe) || nprobe <= 0) {
-            throw new TypeError('nprobe must be a positive integer');
-        }
-        
-        if (!this._native) {
-            throw new Error('Index has been disposed');
-        }
+        validatePositiveInteger('nprobe', nprobe);
+        this._ensureActive();
         
         try {
             this._native.setNprobe(nprobe);
@@ -149,6 +168,8 @@ class FaissIndex {
      * @returns {Promise<{distances: Float32Array, labels: Int32Array}>}
      */
     async search(query, k) {
+        this._ensureActive();
+
         if (!(query instanceof Float32Array)) {
             throw new TypeError('query must be a Float32Array');
         }
@@ -182,9 +203,7 @@ class FaissIndex {
      * @returns {Promise<{distances: Float32Array, labels: Int32Array, nq: number, k: number}>}
      */
     async searchBatch(queries, k) {
-        if (!this._native) {
-            throw new Error('Index has been disposed');
-        }
+        this._ensureActive();
         
         if (!(queries instanceof Float32Array)) {
             throw new TypeError('queries must be a Float32Array');
@@ -224,6 +243,8 @@ class FaissIndex {
      * @returns {Promise<{distances: Float32Array, labels: Int32Array, nq: number, lims: Uint32Array}>}
      */
     async rangeSearch(query, radius) {
+        this._ensureActive();
+
         if (!(query instanceof Float32Array)) {
             throw new TypeError('query must be a Float32Array');
         }
@@ -236,10 +257,6 @@ class FaissIndex {
         
         if (typeof radius !== 'number' || radius < 0 || !isFinite(radius)) {
             throw new TypeError('radius must be a non-negative finite number');
-        }
-        
-        if (!this._native) {
-            throw new Error('Index has been disposed');
         }
         
         // Async operation using background worker
@@ -261,6 +278,8 @@ class FaissIndex {
      * @returns {Object} Statistics object
      */
     getStats() {
+        this._ensureActive();
+
         try {
             return this._native.getStats();
         } catch (error) {
@@ -274,9 +293,7 @@ class FaissIndex {
      * @returns {void}
      */
     reset() {
-        if (!this._native) {
-            throw new Error('Index has been disposed');
-        }
+        this._ensureActive();
         
         try {
             this._native.reset();
@@ -305,6 +322,8 @@ class FaissIndex {
      * @returns {Promise<void>}
      */
     async save(filename) {
+        this._ensureActive();
+
         if (typeof filename !== 'string' || filename.length === 0) {
             throw new TypeError('filename must be a non-empty string');
         }
@@ -321,6 +340,8 @@ class FaissIndex {
      * @returns {Promise<Buffer>}
      */
     async toBuffer() {
+        this._ensureActive();
+
         try {
             return await this._native.toBuffer();
         } catch (error) {
@@ -329,14 +350,13 @@ class FaissIndex {
     }
     
     /**
-     * Merge vectors from another index into this index
+     * Transfer vectors from another index into this index.
+     * FAISS empties the source index as part of merge_from().
      * @param {FaissIndex} otherIndex - Another FaissIndex to merge from
      * @returns {Promise<void>}
      */
     async mergeFrom(otherIndex) {
-        if (!this._native) {
-            throw new Error('Index has been disposed');
-        }
+        this._ensureActive();
         
         if (!otherIndex || !otherIndex._native) {
             throw new TypeError('otherIndex must be a valid FaissIndex');
