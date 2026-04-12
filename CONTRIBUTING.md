@@ -61,6 +61,20 @@ I try to keep things consistent:
 4. Ensure all tests pass
 5. Update documentation if needed
 6. Submit PR with clear description
+7. Address any CodeRabbit AI feedback (see below)
+
+### CodeRabbit AI Review
+
+This project uses [CodeRabbit](https://coderabbit.ai) for AI-powered code reviews. When you open a PR:
+
+- CodeRabbit will automatically review your code
+- Check the PR comments for AI-generated feedback
+- Address suggestions by making changes or replying to the bot
+- Use `@coderabbitai` to ask questions about the review
+
+See [CODERABBIT_SETUP.md](CODERABBIT_SETUP.md) for detailed information.
+
+**Note:** CodeRabbit is free for open source and helps catch issues early!
 
 ## CI/CD
 
