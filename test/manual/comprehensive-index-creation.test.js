@@ -3,7 +3,7 @@
  * 100+ test cases covering all edge cases, boundary conditions, and error scenarios
  */
 
-const { FaissIndex } = require('../../src/js/index');
+const { FaissIndex, ValidationError } = require('../../src/js/index');
 
 describe('Index Creation - Comprehensive Manual Tests (100+ cases)', () => {
     
@@ -50,21 +50,21 @@ describe('Index Creation - Comprehensive Manual Tests (100+ cases)', () => {
     
     describe('Invalid Config Types', () => {
         test.each([
-            [null, TypeError, 'null config'],
-            [undefined, TypeError, 'undefined config'],
-            ['string', TypeError, 'string config'],
-            [123, TypeError, 'number config'],
-            [true, TypeError, 'boolean config'],
-            [false, TypeError, 'boolean false config'],
-            [[], TypeError, 'array config'],
-            [() => {}, TypeError, 'function config'],
-            [Symbol('test'), TypeError, 'symbol config'],
-            [BigInt(123), TypeError, 'bigint config'],
-            [new Date(), TypeError, 'date config'],
-            [new Error(), TypeError, 'error config'],
-            [new Map(), TypeError, 'map config'],
-            [new Set(), TypeError, 'set config'],
-            [NaN, TypeError, 'NaN config'],
+            [null, ValidationError, 'null config'],
+            [undefined, ValidationError, 'undefined config'],
+            ['string', ValidationError, 'string config'],
+            [123, ValidationError, 'number config'],
+            [true, ValidationError, 'boolean config'],
+            [false, ValidationError, 'boolean false config'],
+            [[], ValidationError, 'array config'],
+            [() => {}, ValidationError, 'function config'],
+            [Symbol('test'), ValidationError, 'symbol config'],
+            [BigInt(123), ValidationError, 'bigint config'],
+            [new Date(), ValidationError, 'date config'],
+            [new Error(), ValidationError, 'error config'],
+            [new Map(), ValidationError, 'map config'],
+            [new Set(), ValidationError, 'set config'],
+            [NaN, ValidationError, 'NaN config'],
         ])('throws %s for %s', (config, errorType, description) => {
             expect(() => new FaissIndex(config)).toThrow(errorType);
         });
@@ -76,31 +76,31 @@ describe('Index Creation - Comprehensive Manual Tests (100+ cases)', () => {
     
     describe('Invalid Dims Values', () => {
         test.each([
-            [{ dims: null }, TypeError, 'null dims'],
-            [{ dims: undefined }, TypeError, 'undefined dims'],
-            [{ dims: '128' }, TypeError, 'string dims'],
-            [{ dims: 'abc' }, TypeError, 'non-numeric string dims'],
-            [{ dims: '0' }, TypeError, 'string zero dims'],
-            [{ dims: 0 }, TypeError, 'zero dims'],
-            [{ dims: -1 }, TypeError, 'negative dims'],
-            [{ dims: -100 }, TypeError, 'large negative dims'],
-            [{ dims: -0.1 }, TypeError, 'negative float dims'],
-            [{ dims: 128.5 }, TypeError, 'float dims'],
-            [{ dims: 128.9 }, TypeError, 'float dims'],
-            [{ dims: 0.5 }, TypeError, 'small float dims'],
-            [{ dims: 1.1 }, TypeError, 'float dims'],
-            [{ dims: Infinity }, TypeError, 'infinity dims'],
-            [{ dims: -Infinity }, TypeError, 'negative infinity dims'],
+            [{ dims: null }, ValidationError, 'null dims'],
+            [{ dims: undefined }, ValidationError, 'undefined dims'],
+            [{ dims: '128' }, ValidationError, 'string dims'],
+            [{ dims: 'abc' }, ValidationError, 'non-numeric string dims'],
+            [{ dims: '0' }, ValidationError, 'string zero dims'],
+            [{ dims: 0 }, ValidationError, 'zero dims'],
+            [{ dims: -1 }, ValidationError, 'negative dims'],
+            [{ dims: -100 }, ValidationError, 'large negative dims'],
+            [{ dims: -0.1 }, ValidationError, 'negative float dims'],
+            [{ dims: 128.5 }, ValidationError, 'float dims'],
+            [{ dims: 128.9 }, ValidationError, 'float dims'],
+            [{ dims: 0.5 }, ValidationError, 'small float dims'],
+            [{ dims: 1.1 }, ValidationError, 'float dims'],
+            [{ dims: Infinity }, ValidationError, 'infinity dims'],
+            [{ dims: -Infinity }, ValidationError, 'negative infinity dims'],
             [{ dims: Number.MAX_VALUE }, [RangeError, Error], 'max value dims'],
-            [{ dims: Number.MIN_VALUE }, TypeError, 'min value dims'],
-            [{ dims: Number.MAX_SAFE_INTEGER + 1 }, [Error, RangeError, TypeError], 'unsafe integer'],
-            [{ dims: Number.MIN_SAFE_INTEGER }, TypeError, 'min safe integer'],
-            [{ dims: [] }, TypeError, 'array dims'],
-            [{ dims: {} }, TypeError, 'object dims'],
-            [{ dims: () => {} }, TypeError, 'function dims'],
-            [{ dims: true }, TypeError, 'boolean true dims'],
-            [{ dims: false }, TypeError, 'boolean false dims'],
-            [{ dims: NaN }, TypeError, 'NaN dims'],
+            [{ dims: Number.MIN_VALUE }, ValidationError, 'min value dims'],
+            [{ dims: Number.MAX_SAFE_INTEGER + 1 }, [Error, RangeError, ValidationError], 'unsafe integer'],
+            [{ dims: Number.MIN_SAFE_INTEGER }, ValidationError, 'min safe integer'],
+            [{ dims: [] }, ValidationError, 'array dims'],
+            [{ dims: {} }, ValidationError, 'object dims'],
+            [{ dims: () => {} }, ValidationError, 'function dims'],
+            [{ dims: true }, ValidationError, 'boolean true dims'],
+            [{ dims: false }, ValidationError, 'boolean false dims'],
+            [{ dims: NaN }, ValidationError, 'NaN dims'],
         ])('throws error for %s', (config, errorType, description) => {
             if (Array.isArray(errorType)) {
                 expect(() => new FaissIndex(config)).toThrow();
@@ -142,12 +142,12 @@ describe('Index Creation - Comprehensive Manual Tests (100+ cases)', () => {
     
     describe('Missing Required Fields', () => {
         test.each([
-            [{}, TypeError, 'empty object'],
-            [{ type: 'FLAT_L2' }, TypeError, 'missing dims'],
-            [{ other: 'value' }, TypeError, 'wrong property'],
-            [{ dims: undefined }, TypeError, 'dims undefined'],
-            [{ dims: null }, TypeError, 'dims null'],
-            [{ type: 'FLAT_L2', other: 'value' }, TypeError, 'missing dims with type'],
+            [{}, ValidationError, 'empty object'],
+            [{ type: 'FLAT_L2' }, ValidationError, 'missing dims'],
+            [{ other: 'value' }, ValidationError, 'wrong property'],
+            [{ dims: undefined }, ValidationError, 'dims undefined'],
+            [{ dims: null }, ValidationError, 'dims null'],
+            [{ type: 'FLAT_L2', other: 'value' }, ValidationError, 'missing dims with type'],
             [{ dims: 128, other: 'value' }, undefined, 'extra fields with valid dims'],
             [{ dims: 128, type: 'FLAT_L2', extra1: 'a', extra2: 'b' }, undefined, 'multiple extra fields'],
             [{ dims: 128, nested: { a: 1 } }, undefined, 'nested extra object'],
@@ -435,23 +435,23 @@ describe('Index Creation - Comprehensive Manual Tests (100+ cases)', () => {
     
     describe('Type Coercion Edge Cases', () => {
         test('rejects string that looks like number', () => {
-            expect(() => new FaissIndex({ dims: '128' })).toThrow(TypeError);
+            expect(() => new FaissIndex({ dims: '128' })).toThrow(ValidationError);
         });
 
         test('rejects string with leading zeros', () => {
-            expect(() => new FaissIndex({ dims: '0128' })).toThrow(TypeError);
+            expect(() => new FaissIndex({ dims: '0128' })).toThrow(ValidationError);
         });
 
         test('rejects string with scientific notation', () => {
-            expect(() => new FaissIndex({ dims: '1e2' })).toThrow(TypeError);
+            expect(() => new FaissIndex({ dims: '1e2' })).toThrow(ValidationError);
         });
 
         test('rejects string with decimal point', () => {
-            expect(() => new FaissIndex({ dims: '128.0' })).toThrow(TypeError);
+            expect(() => new FaissIndex({ dims: '128.0' })).toThrow(ValidationError);
         });
 
         test('rejects string with whitespace', () => {
-            expect(() => new FaissIndex({ dims: ' 128 ' })).toThrow(TypeError);
+            expect(() => new FaissIndex({ dims: ' 128 ' })).toThrow(ValidationError);
         });
     });
 

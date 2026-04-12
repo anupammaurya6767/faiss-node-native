@@ -7,10 +7,19 @@
 #include <vector>
 #include <mutex>
 
+#if __has_include(<faiss/gpu/StandardGpuResources.h>) && __has_include(<faiss/gpu/GpuCloner.h>)
+#define FAISS_NODE_HAVE_GPU 1
+#endif
+
 // Forward declarations - full definitions in .cpp file
 namespace faiss {
     struct Index;  // FAISS defines Index as struct, not class
     using idx_t = int64_t;  // idx_t is int64_t (defined in MetricType.h)
+#ifdef FAISS_NODE_HAVE_GPU
+    namespace gpu {
+        class StandardGpuResources;
+    }
+#endif
 }
 
 /**
@@ -57,6 +66,12 @@ public:
     // distances: output array (nq * k elements) - caller must allocate
     // labels: output array (nq * k elements) - caller must allocate
     void SearchBatch(const float* queries, size_t nq, int k, float* distances, int64_t* labels) const;
+
+    // Reconstruct a stored vector by its internal id
+    void Reconstruct(int64_t id, float* output) const;
+
+    // Reconstruct a batch of stored vectors by their internal ids
+    void ReconstructBatch(const int64_t* ids, size_t n, float* output) const;
     
     // Train the index (required for IVF indexes)
     void Train(const float* vectors, size_t n);
@@ -74,6 +89,12 @@ public:
     
     // Configure HNSW-specific parameters after index construction
     void SetHnswParams(int efConstruction, int efSearch);
+
+    // Convert the wrapped index between CPU and GPU when FAISS GPU support is available.
+    void ToGpu(int device);
+    void ToCpu();
+    bool IsGpuResident() const;
+    static bool HasGpuSupport();
     
     // Dispose: explicitly free resources
     void Dispose();
@@ -102,6 +123,10 @@ public:
     
     // Reset: clear all vectors from the index (reuse index object)
     void Reset();
+
+    // Remove specific vector ids from the index.
+    // Returns the number of removed vectors.
+    size_t RemoveIds(const int64_t* ids, size_t n);
     
     // Range search: find all vectors within radius
     // query: pointer to query vector (dims elements)
@@ -122,6 +147,11 @@ private:
     std::string type_label_;
     std::string factory_description_;
     mutable std::mutex mutex_;  // Protect concurrent access
+#ifdef FAISS_NODE_HAVE_GPU
+    std::shared_ptr<faiss::gpu::StandardGpuResources> gpu_resources_;
+    bool gpu_resident_ = false;
+    int gpu_device_ = -1;
+#endif
 };
 
 #endif // FAISS_NODE_INDEX_H

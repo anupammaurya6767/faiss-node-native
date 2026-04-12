@@ -1,5 +1,9 @@
 // Include FAISS headers FIRST, before our header
 // This ensures all FAISS types are properly defined
+#if __has_include(<faiss/gpu/StandardGpuResources.h>) && __has_include(<faiss/gpu/GpuCloner.h>)
+#define FAISS_NODE_HAVE_GPU 1
+#endif
+
 #include <faiss/impl/FaissAssert.h>
 #include <faiss/MetricType.h>
 #include <faiss/Index.h>
@@ -11,10 +15,16 @@
 #include <faiss/IndexPreTransform.h>
 #include <faiss/IndexScalarQuantizer.h>
 #include <faiss/VectorTransform.h>
+#include <faiss/impl/IDSelector.h>
+#include <faiss/invlists/DirectMap.h>
 #include <faiss/index_factory.h>
 #include <faiss/index_io.h>
 #include <faiss/impl/io.h>
 #include <faiss/impl/AuxIndexStructures.h>
+#ifdef FAISS_NODE_HAVE_GPU
+#include <faiss/gpu/GpuCloner.h>
+#include <faiss/gpu/StandardGpuResources.h>
+#endif
 #include <fstream>
 #include <sstream>
 #include <cstdio>
@@ -101,6 +111,36 @@ std::string InferIndexType(const faiss::Index* index) {
     return "CUSTOM";
 }
 
+void EnableSequentialDirectMap(faiss::Index* index) {
+    if (index == nullptr) {
+        return;
+    }
+
+    auto* pretransform = dynamic_cast<faiss::IndexPreTransform*>(index);
+    if (pretransform != nullptr) {
+        EnableSequentialDirectMap(pretransform->index);
+        return;
+    }
+
+    auto* ivf = dynamic_cast<faiss::IndexIVF*>(index);
+    if (ivf != nullptr) {
+        ivf->set_direct_map_type(faiss::DirectMap::Array);
+    }
+}
+
+faiss::IndexIVF* FindIvfIndex(faiss::Index* index) {
+    if (index == nullptr) {
+        return nullptr;
+    }
+
+    auto* pretransform = dynamic_cast<faiss::IndexPreTransform*>(index);
+    if (pretransform != nullptr) {
+        return FindIvfIndex(pretransform->index);
+    }
+
+    return dynamic_cast<faiss::IndexIVF*>(index);
+}
+
 }  // namespace
 
 FaissIndexWrapper::FaissIndexWrapper(
@@ -121,6 +161,7 @@ FaissIndexWrapper::FaissIndexWrapper(
     // Examples: "Flat" -> IndexFlatL2, "IVF100,Flat" -> IndexIVFFlat, "HNSW32" -> IndexHNSW
     faiss::MetricType metricType = static_cast<faiss::MetricType>(metric);
     index_ = std::unique_ptr<faiss::Index>(faiss::index_factory(dims, indexDescription.c_str(), metricType));
+    EnableSequentialDirectMap(index_.get());
 
     if (type_label_.empty()) {
         type_label_ = InferIndexType(index_.get());
@@ -227,6 +268,47 @@ void FaissIndexWrapper::SearchBatch(const float* queries, size_t nq, int k, floa
     index_->search(nq, queries, actual_k, distances, reinterpret_cast<faiss::idx_t*>(labels));
 }
 
+void FaissIndexWrapper::Reconstruct(int64_t id, float* output) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (disposed_) {
+        throw std::runtime_error("Index has been disposed");
+    }
+
+    if (output == nullptr) {
+        throw std::invalid_argument("Output buffer cannot be null");
+    }
+
+    if (id < 0 || id >= static_cast<int64_t>(index_->ntotal)) {
+        throw std::out_of_range("Vector id is out of range");
+    }
+
+    index_->reconstruct(id, output);
+}
+
+void FaissIndexWrapper::ReconstructBatch(const int64_t* ids, size_t n, float* output) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (disposed_) {
+        throw std::runtime_error("Index has been disposed");
+    }
+
+    if (ids == nullptr) {
+        throw std::invalid_argument("Ids pointer cannot be null");
+    }
+
+    if (output == nullptr) {
+        throw std::invalid_argument("Output buffer cannot be null");
+    }
+
+    for (size_t i = 0; i < n; i++) {
+        if (ids[i] < 0 || ids[i] >= static_cast<int64_t>(index_->ntotal)) {
+            throw std::out_of_range("Vector id is out of range");
+        }
+        index_->reconstruct(ids[i], output + (i * dims_));
+    }
+}
+
 size_t FaissIndexWrapper::GetTotalVectors() const {
     std::lock_guard<std::mutex> lock(mutex_);
     if (disposed_) {
@@ -311,6 +393,11 @@ void FaissIndexWrapper::Dispose() {
     }
     
     disposed_ = true;
+#ifdef FAISS_NODE_HAVE_GPU
+    gpu_resources_.reset();
+    gpu_resident_ = false;
+    gpu_device_ = -1;
+#endif
     index_.reset();
 }
 
@@ -325,7 +412,18 @@ void FaissIndexWrapper::Save(const std::string& filename) const {
     }
     
     try {
+#ifdef FAISS_NODE_HAVE_GPU
+        std::unique_ptr<faiss::Index> cpuClone;
+        const faiss::Index* savableIndex = index_.get();
+        if (gpu_resident_) {
+            cpuClone.reset(faiss::gpu::index_gpu_to_cpu(index_.get()));
+            EnableSequentialDirectMap(cpuClone.get());
+            savableIndex = cpuClone.get();
+        }
+        faiss::write_index(savableIndex, filename.c_str());
+#else
         faiss::write_index(index_.get(), filename.c_str());
+#endif
     } catch (const std::exception& e) {
         throw std::runtime_error(std::string("Failed to save index: ") + e.what());
     }
@@ -338,6 +436,7 @@ std::unique_ptr<FaissIndexWrapper> FaissIndexWrapper::Load(const std::string& fi
     
     try {
         faiss::Index* loaded_index = faiss::read_index(filename.c_str());
+        EnableSequentialDirectMap(loaded_index);
         
         // Create wrapper with loaded index (supports any index type)
         auto wrapper = std::make_unique<FaissIndexWrapper>(loaded_index->d);
@@ -362,7 +461,18 @@ std::vector<uint8_t> FaissIndexWrapper::ToBuffer() const {
         // Use FAISS VectorIOWriter for direct memory serialization (no temp files)
         // This is the same approach used by ewfian/faiss-node
         faiss::VectorIOWriter writer;
+#ifdef FAISS_NODE_HAVE_GPU
+        std::unique_ptr<faiss::Index> cpuClone;
+        const faiss::Index* serializableIndex = index_.get();
+        if (gpu_resident_) {
+            cpuClone.reset(faiss::gpu::index_gpu_to_cpu(index_.get()));
+            EnableSequentialDirectMap(cpuClone.get());
+            serializableIndex = cpuClone.get();
+        }
+        faiss::write_index(serializableIndex, &writer);
+#else
         faiss::write_index(index_.get(), &writer);
+#endif
         
         // Return the buffer directly
         return writer.data;
@@ -383,6 +493,7 @@ std::unique_ptr<FaissIndexWrapper> FaissIndexWrapper::FromBuffer(const uint8_t* 
         reader.data.assign(data, data + length);
         
         faiss::Index* loaded_index = faiss::read_index(&reader);
+        EnableSequentialDirectMap(loaded_index);
         
         // Create wrapper with loaded index (supports any index type)
         auto wrapper = std::make_unique<FaissIndexWrapper>(loaded_index->d);
@@ -445,6 +556,86 @@ void FaissIndexWrapper::SetHnswParams(int efConstruction, int efSearch) {
     }
 }
 
+void FaissIndexWrapper::ToGpu(int device) {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (disposed_) {
+        throw std::runtime_error("Index has been disposed");
+    }
+
+    if (device < 0) {
+        throw std::invalid_argument("GPU device must be non-negative");
+    }
+
+#ifdef FAISS_NODE_HAVE_GPU
+    try {
+        std::unique_ptr<faiss::Index> cpuClone;
+        const faiss::Index* sourceIndex = index_.get();
+        if (gpu_resident_) {
+            cpuClone.reset(faiss::gpu::index_gpu_to_cpu(index_.get()));
+            EnableSequentialDirectMap(cpuClone.get());
+            sourceIndex = cpuClone.get();
+        }
+
+        auto resources = std::make_shared<faiss::gpu::StandardGpuResources>();
+        std::unique_ptr<faiss::Index> gpuIndex(
+            faiss::gpu::index_cpu_to_gpu(resources.get(), device, sourceIndex));
+
+        index_ = std::move(gpuIndex);
+        gpu_resources_ = std::move(resources);
+        gpu_resident_ = true;
+        gpu_device_ = device;
+    } catch (const std::exception& e) {
+        throw std::runtime_error(std::string("Failed to move index to GPU: ") + e.what());
+    }
+#else
+    (void)device;
+    throw std::runtime_error("GPU support not available in this build");
+#endif
+}
+
+void FaissIndexWrapper::ToCpu() {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (disposed_) {
+        throw std::runtime_error("Index has been disposed");
+    }
+
+#ifdef FAISS_NODE_HAVE_GPU
+    if (!gpu_resident_) {
+        return;
+    }
+
+    try {
+        std::unique_ptr<faiss::Index> cpuIndex(faiss::gpu::index_gpu_to_cpu(index_.get()));
+        EnableSequentialDirectMap(cpuIndex.get());
+        index_ = std::move(cpuIndex);
+        gpu_resources_.reset();
+        gpu_resident_ = false;
+        gpu_device_ = -1;
+    } catch (const std::exception& e) {
+        throw std::runtime_error(std::string("Failed to move index to CPU: ") + e.what());
+    }
+#endif
+}
+
+bool FaissIndexWrapper::IsGpuResident() const {
+#ifdef FAISS_NODE_HAVE_GPU
+    std::lock_guard<std::mutex> lock(mutex_);
+    return !disposed_ && gpu_resident_;
+#else
+    return false;
+#endif
+}
+
+bool FaissIndexWrapper::HasGpuSupport() {
+#ifdef FAISS_NODE_HAVE_GPU
+    return true;
+#else
+    return false;
+#endif
+}
+
 void FaissIndexWrapper::Reset() {
     std::lock_guard<std::mutex> lock(mutex_);
     
@@ -457,6 +648,45 @@ void FaissIndexWrapper::Reset() {
         index_->reset();
     } catch (const std::exception& e) {
         throw std::runtime_error(std::string("Failed to reset index: ") + e.what());
+    }
+}
+
+size_t FaissIndexWrapper::RemoveIds(const int64_t* ids, size_t n) {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (disposed_) {
+        throw std::runtime_error("Index has been disposed");
+    }
+
+    if (ids == nullptr) {
+        throw std::invalid_argument("Ids pointer cannot be null");
+    }
+
+    if (n == 0) {
+        return 0;
+    }
+
+    std::vector<faiss::idx_t> faissIds(n);
+    for (size_t i = 0; i < n; i++) {
+        if (ids[i] < 0) {
+            throw std::invalid_argument("Ids must be non-negative");
+        }
+        faissIds[i] = static_cast<faiss::idx_t>(ids[i]);
+    }
+
+    faiss::IDSelectorBatch selector(n, faissIds.data());
+    try {
+        return index_->remove_ids(selector);
+    } catch (const std::exception& e) {
+        faiss::IndexIVF* ivf = FindIvfIndex(index_.get());
+        const std::string message = e.what();
+        if (ivf != nullptr && message.find("direct_map format") != std::string::npos) {
+            ivf->set_direct_map_type(faiss::DirectMap::NoMap);
+            size_t removed = index_->remove_ids(selector);
+            ivf->set_direct_map_type(faiss::DirectMap::Hashtable);
+            return removed;
+        }
+        throw;
     }
 }
 

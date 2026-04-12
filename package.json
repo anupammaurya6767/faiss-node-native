@@ -1,9 +1,12 @@
 {
   "name": "@faiss-node/native",
-  "version": "0.1.10",
-  "description": "High-performance Node.js native bindings for Facebook FAISS - the fastest vector similarity search library. Supports FLAT_L2, IVF_FLAT, and HNSW index types with async operations, persistence, and batch search. Works on macOS, Linux, and Windows (via WSL2/Docker).",
+  "version": "0.1.11",
+  "description": "High-performance Node.js native bindings for Facebook FAISS with float and binary indexes, CLI tooling, optional GPU migration hooks, async operations, persistence, and vector utility helpers.",
   "main": "src/js/index.js",
   "types": "src/js/types.d.ts",
+  "bin": {
+    "faiss-node": "src/js/cli.js"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/anupammaurya6767/faiss-node-native.git"
@@ -69,11 +72,15 @@
     "indexivf",
     "hnsw",
     "hierarchical-nsw",
-    "ivf"
+    "ivf",
+    "binary-vectors",
+    "hamming-distance",
+    "gpu"
   ],
   "scripts": {
     "build": "node-gyp rebuild",
     "clean": "node-gyp clean",
+    "cli": "node src/js/cli.js",
     "test": "jest",
     "test:ci": "jest --ci --coverage --config=jest.ci.config.js --testPathIgnorePatterns=manual",
     "test:unit": "jest test/unit",

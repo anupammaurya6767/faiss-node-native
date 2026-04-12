@@ -6,7 +6,9 @@
       "cflags_cc!": [ "-fno-exceptions" ],
       "sources": [
         "src/cpp/faiss_index.cpp",
-        "src/cpp/napi_bindings.cpp"
+        "src/cpp/faiss_binary_index.cpp",
+        "src/cpp/napi_bindings.cpp",
+        "src/cpp/napi_binary_bindings.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",
@@ -67,20 +69,24 @@
           "include_dirs": [
             "<!@(node -p \"require('node-addon-api').include\")",
             "src/cpp",
+            "/usr/local/cuda/include",
+            "/usr/local/cuda/targets/x86_64-linux/include",
             "/usr/local/include",
             "/usr/include"
           ],
           "libraries": [
             "-L/usr/local/lib",
             "-L/usr/lib",
+            "<!@(bash -lc 'for dir in /usr/local/cuda/lib64 /usr/local/cuda/targets/x86_64-linux/lib; do if [ -d \"$dir\" ]; then printf -- \"-L%s\\n\" \"$dir\"; fi; done')",
             "-lfaiss",
             "-lopenblas",
-            "-lgomp"
+            "-lgomp",
+            "<!@(bash -lc 'if [ -e /usr/local/cuda/lib64/libcudart.so ] || [ -e /usr/local/cuda/targets/x86_64-linux/lib/libcudart.so ]; then printf -- \"-lcudart\\n\"; fi; if [ -e /usr/local/cuda/lib64/libcublas.so ] || [ -e /usr/local/cuda/targets/x86_64-linux/lib/libcublas.so ]; then printf -- \"-lcublas\\n\"; fi')"
           ],
           "ldflags": [
             "-L/usr/local/lib",
             "-L/usr/lib",
-            "-Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu"
+            "-Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu:/usr/local/cuda/lib64:/usr/local/cuda/targets/x86_64-linux/lib"
           ],
           "cflags_cc": [
             "-std=c++17",

@@ -3,7 +3,11 @@
  * 100+ test cases covering all edge cases, boundary conditions, and error scenarios
  */
 
-const { FaissIndex } = require('../../src/js/index');
+const {
+    FaissIndex,
+    ValidationError,
+    InvalidVectorError,
+} = require('../../src/js/index');
 
 describe('SearchBatch - Comprehensive Manual Tests (100+ cases)', () => {
     
@@ -64,21 +68,21 @@ describe('SearchBatch - Comprehensive Manual Tests (100+ cases)', () => {
         });
 
         test.each([
-            [null, TypeError, 'null queries'],
-            [undefined, TypeError, 'undefined queries'],
-            ['string', TypeError, 'string queries'],
-            [123, TypeError, 'number queries'],
-            [true, TypeError, 'boolean queries'],
-            [[], TypeError, 'empty array'],
-            [[0.1, 0.2, 0.3, 0.4], TypeError, 'regular array'],
-            [new Int32Array(4), TypeError, 'Int32Array'],
-            [new Uint8Array(4), TypeError, 'Uint8Array'],
-            [new ArrayBuffer(16), TypeError, 'ArrayBuffer'],
-            [{}, TypeError, 'object queries'],
-            [() => {}, TypeError, 'function queries'],
-            [new Map(), TypeError, 'map queries'],
-            [new Set(), TypeError, 'set queries'],
-            [Symbol('test'), TypeError, 'symbol queries'],
+            [null, InvalidVectorError, 'null queries'],
+            [undefined, InvalidVectorError, 'undefined queries'],
+            ['string', InvalidVectorError, 'string queries'],
+            [123, InvalidVectorError, 'number queries'],
+            [true, InvalidVectorError, 'boolean queries'],
+            [[], InvalidVectorError, 'empty array'],
+            [[0.1, 0.2, 0.3, 0.4], InvalidVectorError, 'regular array'],
+            [new Int32Array(4), InvalidVectorError, 'Int32Array'],
+            [new Uint8Array(4), InvalidVectorError, 'Uint8Array'],
+            [new ArrayBuffer(16), InvalidVectorError, 'ArrayBuffer'],
+            [{}, InvalidVectorError, 'object queries'],
+            [() => {}, InvalidVectorError, 'function queries'],
+            [new Map(), InvalidVectorError, 'map queries'],
+            [new Set(), InvalidVectorError, 'set queries'],
+            [Symbol('test'), InvalidVectorError, 'symbol queries'],
         ])('throws %s for %s', async (queries, errorType, description) => {
             await expect(index.searchBatch(queries, 1)).rejects.toThrow(errorType);
         });
@@ -163,22 +167,22 @@ describe('SearchBatch - Comprehensive Manual Tests (100+ cases)', () => {
         const queries = new Float32Array([0.1, 0.2, 0.3, 0.4]);
 
         test.each([
-            [null, TypeError, 'null k'],
-            [undefined, TypeError, 'undefined k'],
-            ['string', TypeError, 'string k'],
-            [0, TypeError, 'zero k'],
-            [-1, TypeError, 'negative k'],
-            [-100, TypeError, 'large negative k'],
-            [0.5, TypeError, 'float k'],
-            [1.5, TypeError, 'float k'],
-            [Infinity, TypeError, 'infinity k'],
-            [-Infinity, TypeError, 'negative infinity k'],
-            [[], TypeError, 'array k'],
-            [{}, TypeError, 'object k'],
-            [() => {}, TypeError, 'function k'],
-            [true, TypeError, 'boolean true k'],
-            [false, TypeError, 'boolean false k'],
-            [NaN, TypeError, 'NaN k'],
+            [null, ValidationError, 'null k'],
+            [undefined, ValidationError, 'undefined k'],
+            ['string', ValidationError, 'string k'],
+            [0, ValidationError, 'zero k'],
+            [-1, ValidationError, 'negative k'],
+            [-100, ValidationError, 'large negative k'],
+            [0.5, ValidationError, 'float k'],
+            [1.5, ValidationError, 'float k'],
+            [Infinity, ValidationError, 'infinity k'],
+            [-Infinity, ValidationError, 'negative infinity k'],
+            [[], ValidationError, 'array k'],
+            [{}, ValidationError, 'object k'],
+            [() => {}, ValidationError, 'function k'],
+            [true, ValidationError, 'boolean true k'],
+            [false, ValidationError, 'boolean false k'],
+            [NaN, ValidationError, 'NaN k'],
         ])('throws %s for %s', async (k, errorType, description) => {
             await expect(index.searchBatch(queries, k)).rejects.toThrow(errorType);
         });

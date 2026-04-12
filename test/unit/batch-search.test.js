@@ -1,4 +1,4 @@
-const { FaissIndex } = require('../../src/js/index');
+const { FaissIndex, InvalidVectorError } = require('../../src/js/index');
 
 describe('FaissIndex - Batch Search', () => {
   let index;
@@ -118,9 +118,9 @@ describe('FaissIndex - Batch Search', () => {
 
   describe('Input Validation', () => {
     test('throws on invalid query type', async () => {
-      await expect(index.searchBatch([1, 2, 3, 4], 1)).rejects.toThrow(TypeError);
-      await expect(index.searchBatch(null, 1)).rejects.toThrow(TypeError);
-      await expect(index.searchBatch(undefined, 1)).rejects.toThrow(TypeError);
+      await expect(index.searchBatch([1, 2, 3, 4], 1)).rejects.toThrow(InvalidVectorError);
+      await expect(index.searchBatch(null, 1)).rejects.toThrow(InvalidVectorError);
+      await expect(index.searchBatch(undefined, 1)).rejects.toThrow(InvalidVectorError);
     });
 
     test('throws on empty queries array', async () => {

@@ -1,6 +1,6 @@
 # GitHub Pages Setup Guide
 
-I wrote this guide to help set up automated documentation deployment to GitHub Pages. Here's how I did it:
+This guide explains how the repository publishes documentation to GitHub Pages.
 
 ### Step 1: Enable GitHub Pages
 
@@ -10,11 +10,11 @@ I wrote this guide to help set up automated documentation deployment to GitHub P
    - **Source**: `GitHub Actions` (not "Deploy from a branch")
 4. Click **Save**
 
-That's it! The workflow I set up will handle the rest.
+That's it. The workflow handles the rest.
 
 ### Step 2: Verify Workflow Permissions
 
-I've already configured the workflow (`.github/workflows/docs.yml`) with the correct permissions:
+The workflow (`.github/workflows/docs.yml`) already includes the required permissions:
 - `contents: read` - Read repository
 - `pages: write` - Write to GitHub Pages
 - `id-token: write` - For OIDC authentication
@@ -27,13 +27,15 @@ I've already configured the workflow (`.github/workflows/docs.yml`) with the cor
    ```
 
 2. The workflow will automatically:
-   - Generate Doxygen documentation
+   - Generate TypeDoc and Doxygen documentation
    - Deploy to GitHub Pages
-   - Make it available at: `https://<username>.github.io/<repo>/docs/`
+   - Publish a landing page at: `https://<username>.github.io/<repo>/`
+   - Publish TypeDoc at: `https://<username>.github.io/<repo>/api/`
+   - Publish Doxygen at: `https://<username>.github.io/<repo>/native/`
 
 ## How It Works
 
-I set up the workflow to automatically deploy when:
+The workflow automatically deploys when:
 
 ### Automatic Deployment
 
@@ -45,20 +47,20 @@ The workflow (`.github/workflows/docs.yml`) I created triggers on:
 
 1. **Checkout**: Gets the latest code
 2. **Install Doxygen**: Installs Doxygen and Graphviz
-3. **Generate**: Runs `npm run docs` to generate HTML
-4. **Upload**: Uploads `docs/html/` as artifact
+3. **Generate**: Runs `npm run docs` to generate TypeDoc and Doxygen output
+4. **Stage**: Builds a small combined Pages site with `/api/` and `/native/`
 5. **Deploy**: Deploys to GitHub Pages using official GitHub Actions
 
 ### Documentation URL
 
 After first deployment, your docs will be available at:
 ```
-https://<username>.github.io/<repo>/docs/
+https://<username>.github.io/<repo>/
 ```
 
 For example:
 ```
-https://yourusername.github.io/faiss-node/docs/
+https://anupammaurya6767.github.io/faiss-node-native/
 ```
 
 ## Troubleshooting
@@ -94,7 +96,7 @@ If you want to use a custom domain:
 
 ## Updating Documentation
 
-The documentation updates automatically when I:
+The documentation updates automatically when you:
 - Push changes to `src/**` files
 - Update `Doxyfile`
 - Update `README.md` (used as main page)

@@ -1,37 +1,41 @@
-const { FaissIndex } = require('../../src/js/index');
+const {
+  FaissIndex,
+  ValidationError,
+  InvalidVectorError,
+} = require('../../src/js/index');
 
 describe('FaissIndex - Edge Cases', () => {
   describe('Constructor Edge Cases', () => {
     test('throws on null config', () => {
       expect(() => {
         new FaissIndex(null);
-      }).toThrow(TypeError);
+      }).toThrow(ValidationError);
     });
 
     test('throws on undefined config', () => {
       expect(() => {
         new FaissIndex(undefined);
-      }).toThrow(TypeError);
+      }).toThrow(ValidationError);
     });
 
     test('throws on non-object config', () => {
       expect(() => {
         new FaissIndex('invalid');
-      }).toThrow(TypeError);
+      }).toThrow(ValidationError);
       
       expect(() => {
         new FaissIndex(123);
-      }).toThrow(TypeError);
+      }).toThrow(ValidationError);
       
       expect(() => {
         new FaissIndex([]);
-      }).toThrow(TypeError);
+      }).toThrow(ValidationError);
     });
 
     test('throws on float dimensions', () => {
       expect(() => {
         new FaissIndex({ dims: 128.5 });
-      }).toThrow(TypeError);
+      }).toThrow(ValidationError);
     });
 
     test('throws on very large dimensions', () => {
@@ -43,7 +47,7 @@ describe('FaissIndex - Edge Cases', () => {
     test('throws on string number for dims', () => {
       expect(() => {
         new FaissIndex({ dims: '128' });
-      }).toThrow(TypeError);
+      }).toThrow(ValidationError);
     });
 
     test('works with missing type (defaults to FLAT_L2)', () => {
@@ -65,23 +69,23 @@ describe('FaissIndex - Edge Cases', () => {
   describe('Add Edge Cases', () => {
     test('throws on null vectors', async () => {
       const index = new FaissIndex({ dims: 4 });
-      await expect(index.add(null)).rejects.toThrow(TypeError);
+      await expect(index.add(null)).rejects.toThrow(InvalidVectorError);
     });
 
     test('throws on undefined vectors', async () => {
       const index = new FaissIndex({ dims: 4 });
-      await expect(index.add(undefined)).rejects.toThrow(TypeError);
+      await expect(index.add(undefined)).rejects.toThrow(InvalidVectorError);
     });
 
     test('throws on non-Float32Array inputs', async () => {
       const index = new FaissIndex({ dims: 4 });
       
-      await expect(index.add([1, 2, 3, 4])).rejects.toThrow(TypeError);
-      await expect(index.add('invalid')).rejects.toThrow(TypeError);
-      await expect(index.add(123)).rejects.toThrow(TypeError);
-      await expect(index.add({})).rejects.toThrow(TypeError);
-      await expect(index.add(new Array(4))).rejects.toThrow(TypeError);
-      await expect(index.add(new Int32Array([1, 2, 3, 4]))).rejects.toThrow(TypeError);
+      await expect(index.add([1, 2, 3, 4])).rejects.toThrow(InvalidVectorError);
+      await expect(index.add('invalid')).rejects.toThrow(InvalidVectorError);
+      await expect(index.add(123)).rejects.toThrow(InvalidVectorError);
+      await expect(index.add({})).rejects.toThrow(InvalidVectorError);
+      await expect(index.add(new Array(4))).rejects.toThrow(InvalidVectorError);
+      await expect(index.add(new Int32Array([1, 2, 3, 4]))).rejects.toThrow(InvalidVectorError);
     });
 
     test('throws on vectors with partial dimension', async () => {
@@ -94,26 +98,25 @@ describe('FaissIndex - Edge Cases', () => {
       await expect(index.add(new Float32Array([1, 2, 3, 4, 5, 6, 7]))).rejects.toThrow();
     });
 
-    test('handles vectors with NaN values', async () => {
+    test('rejects vectors with NaN values', async () => {
       const index = new FaissIndex({ dims: 4 });
       const vectors = new Float32Array([NaN, 0, 0, 0]);
       
-      // Should not throw, but behavior may be undefined
-      await expect(index.add(vectors)).resolves.not.toThrow();
+      await expect(index.add(vectors)).rejects.toThrow(InvalidVectorError);
     });
 
-    test('handles vectors with Infinity values', async () => {
+    test('rejects vectors with Infinity values', async () => {
       const index = new FaissIndex({ dims: 4 });
       const vectors = new Float32Array([Infinity, 0, 0, 0]);
       
-      await expect(index.add(vectors)).resolves.not.toThrow();
+      await expect(index.add(vectors)).rejects.toThrow(InvalidVectorError);
     });
 
     test('handles vectors with very large values', async () => {
       const index = new FaissIndex({ dims: 4 });
       const vectors = new Float32Array([
-        Number.MAX_VALUE,
-        -Number.MAX_VALUE,
+        3e38,
+        -3e38,
         0,
         0
       ]);
@@ -199,40 +202,39 @@ describe('FaissIndex - Edge Cases', () => {
       const index = new FaissIndex({ dims: 4 });
       await index.add(new Float32Array([1, 0, 0, 0]));
       
-      await expect(index.search(null, 1)).rejects.toThrow(TypeError);
+      await expect(index.search(null, 1)).rejects.toThrow(InvalidVectorError);
     });
 
     test('throws on undefined query', async () => {
       const index = new FaissIndex({ dims: 4 });
       await index.add(new Float32Array([1, 0, 0, 0]));
       
-      await expect(index.search(undefined, 1)).rejects.toThrow(TypeError);
+      await expect(index.search(undefined, 1)).rejects.toThrow(InvalidVectorError);
     });
 
     test('throws on non-Float32Array query', async () => {
       const index = new FaissIndex({ dims: 4 });
       await index.add(new Float32Array([1, 0, 0, 0]));
       
-      await expect(index.search([1, 0, 0, 0], 1)).rejects.toThrow(TypeError);
-      await expect(index.search('invalid', 1)).rejects.toThrow(TypeError);
-      await expect(index.search(123, 1)).rejects.toThrow(TypeError);
+      await expect(index.search([1, 0, 0, 0], 1)).rejects.toThrow(InvalidVectorError);
+      await expect(index.search('invalid', 1)).rejects.toThrow(InvalidVectorError);
+      await expect(index.search(123, 1)).rejects.toThrow(InvalidVectorError);
     });
 
-    test('handles query with NaN values', async () => {
+    test('rejects query with NaN values', async () => {
       const index = new FaissIndex({ dims: 4 });
       await index.add(new Float32Array([1, 0, 0, 0]));
       
       const query = new Float32Array([NaN, 0, 0, 0]);
-      // Should not throw, but results may be undefined
-      await expect(index.search(query, 1)).resolves.toBeDefined();
+      await expect(index.search(query, 1)).rejects.toThrow(InvalidVectorError);
     });
 
-    test('handles query with Infinity values', async () => {
+    test('rejects query with Infinity values', async () => {
       const index = new FaissIndex({ dims: 4 });
       await index.add(new Float32Array([1, 0, 0, 0]));
       
       const query = new Float32Array([Infinity, 0, 0, 0]);
-      await expect(index.search(query, 1)).resolves.toBeDefined();
+      await expect(index.search(query, 1)).rejects.toThrow(InvalidVectorError);
     });
 
     test('handles k larger than available vectors', async () => {
@@ -282,7 +284,7 @@ describe('FaissIndex - Edge Cases', () => {
       await index.add(new Float32Array([1, 0, 0, 0]));
       
       const query = new Float32Array([1, 0, 0, 0]);
-      await expect(index.search(query, 1.5)).rejects.toThrow(TypeError);
+      await expect(index.search(query, 1.5)).rejects.toThrow(ValidationError);
     });
 
     test('throws on string k', async () => {
@@ -290,7 +292,7 @@ describe('FaissIndex - Edge Cases', () => {
       await index.add(new Float32Array([1, 0, 0, 0]));
       
       const query = new Float32Array([1, 0, 0, 0]);
-      await expect(index.search(query, '1')).rejects.toThrow(TypeError);
+      await expect(index.search(query, '1')).rejects.toThrow(ValidationError);
     });
 
     test('handles search with zero vector query', async () => {

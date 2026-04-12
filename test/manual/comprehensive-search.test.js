@@ -3,7 +3,11 @@
  * 100+ test cases covering all edge cases, boundary conditions, and error scenarios
  */
 
-const { FaissIndex } = require('../../src/js/index');
+const {
+    FaissIndex,
+    ValidationError,
+    InvalidVectorError,
+} = require('../../src/js/index');
 
 describe('Search - Comprehensive Manual Tests (100+ cases)', () => {
     
@@ -64,21 +68,21 @@ describe('Search - Comprehensive Manual Tests (100+ cases)', () => {
         });
 
         test.each([
-            [null, TypeError, 'null query'],
-            [undefined, TypeError, 'undefined query'],
-            ['string', TypeError, 'string query'],
-            [123, TypeError, 'number query'],
-            [true, TypeError, 'boolean query'],
-            [[], TypeError, 'empty array'],
-            [[0.1, 0.2, 0.3, 0.4], TypeError, 'regular array'],
-            [new Int32Array(4), TypeError, 'Int32Array'],
-            [new Uint8Array(4), TypeError, 'Uint8Array'],
-            [new ArrayBuffer(16), TypeError, 'ArrayBuffer'],
-            [{}, TypeError, 'object query'],
-            [() => {}, TypeError, 'function query'],
-            [new Map(), TypeError, 'map query'],
-            [new Set(), TypeError, 'set query'],
-            [Symbol('test'), TypeError, 'symbol query'],
+            [null, InvalidVectorError, 'null query'],
+            [undefined, InvalidVectorError, 'undefined query'],
+            ['string', InvalidVectorError, 'string query'],
+            [123, InvalidVectorError, 'number query'],
+            [true, InvalidVectorError, 'boolean query'],
+            [[], InvalidVectorError, 'empty array'],
+            [[0.1, 0.2, 0.3, 0.4], InvalidVectorError, 'regular array'],
+            [new Int32Array(4), InvalidVectorError, 'Int32Array'],
+            [new Uint8Array(4), InvalidVectorError, 'Uint8Array'],
+            [new ArrayBuffer(16), InvalidVectorError, 'ArrayBuffer'],
+            [{}, InvalidVectorError, 'object query'],
+            [() => {}, InvalidVectorError, 'function query'],
+            [new Map(), InvalidVectorError, 'map query'],
+            [new Set(), InvalidVectorError, 'set query'],
+            [Symbol('test'), InvalidVectorError, 'symbol query'],
         ])('throws %s for %s', async (query, errorType, description) => {
             await expect(index.search(query, 1)).rejects.toThrow(errorType);
         });
@@ -144,26 +148,26 @@ describe('Search - Comprehensive Manual Tests (100+ cases)', () => {
         const query = new Float32Array([0.1, 0.2, 0.3, 0.4]);
 
         test.each([
-            [null, TypeError, 'null k'],
-            [undefined, TypeError, 'undefined k'],
-            ['string', TypeError, 'string k'],
-            ['1', TypeError, 'string number k'],
-            [0, TypeError, 'zero k'],
-            [-1, TypeError, 'negative k'],
-            [-100, TypeError, 'large negative k'],
-            [0.5, TypeError, 'float k'],
-            [1.5, TypeError, 'float k'],
-            [128.9, TypeError, 'float k'],
-            [Infinity, TypeError, 'infinity k'],
-            [-Infinity, TypeError, 'negative infinity k'],
-            [[], TypeError, 'array k'],
-            [{}, TypeError, 'object k'],
-            [() => {}, TypeError, 'function k'],
-            [true, TypeError, 'boolean true k'],
-            [false, TypeError, 'boolean false k'],
-            [NaN, TypeError, 'NaN k'],
+            [null, ValidationError, 'null k'],
+            [undefined, ValidationError, 'undefined k'],
+            ['string', ValidationError, 'string k'],
+            ['1', ValidationError, 'string number k'],
+            [0, ValidationError, 'zero k'],
+            [-1, ValidationError, 'negative k'],
+            [-100, ValidationError, 'large negative k'],
+            [0.5, ValidationError, 'float k'],
+            [1.5, ValidationError, 'float k'],
+            [128.9, ValidationError, 'float k'],
+            [Infinity, ValidationError, 'infinity k'],
+            [-Infinity, ValidationError, 'negative infinity k'],
+            [[], ValidationError, 'array k'],
+            [{}, ValidationError, 'object k'],
+            [() => {}, ValidationError, 'function k'],
+            [true, ValidationError, 'boolean true k'],
+            [false, ValidationError, 'boolean false k'],
+            [NaN, ValidationError, 'NaN k'],
             [Number.MAX_SAFE_INTEGER + 1, Error, 'unsafe integer k'],
-            [Number.MIN_SAFE_INTEGER, TypeError, 'min safe integer k'],
+            [Number.MIN_SAFE_INTEGER, ValidationError, 'min safe integer k'],
         ])('throws %s for %s', async (k, errorType, description) => {
             await expect(index.search(query, k)).rejects.toThrow(errorType);
         });
@@ -514,36 +518,28 @@ describe('Search - Comprehensive Manual Tests (100+ cases)', () => {
             index.dispose();
         });
 
-        test('handles query with Infinity values', async () => {
+        test('rejects query with Infinity values', async () => {
             const index = new FaissIndex({ dims: 4 });
-            const vectors = new Float32Array([
-                Infinity, Infinity, Infinity, Infinity,
+            await index.add(new Float32Array([
                 1.0, 1.0, 1.0, 1.0,
-            ]);
-            await index.add(vectors);
+                2.0, 2.0, 2.0, 2.0,
+            ]));
             
             const query = new Float32Array([Infinity, Infinity, Infinity, Infinity]);
-            const results = await index.search(query, 2);
-            
-            expect(results.distances.length).toBe(2);
-            expect(results.labels.length).toBe(2);
+            await expect(index.search(query, 2)).rejects.toThrow(InvalidVectorError);
             
             index.dispose();
         });
 
-        test('handles query with NaN values', async () => {
+        test('rejects query with NaN values', async () => {
             const index = new FaissIndex({ dims: 4 });
-            const vectors = new Float32Array([
-                NaN, NaN, NaN, NaN,
+            await index.add(new Float32Array([
                 1.0, 1.0, 1.0, 1.0,
-            ]);
-            await index.add(vectors);
+                2.0, 2.0, 2.0, 2.0,
+            ]));
             
             const query = new Float32Array([NaN, NaN, NaN, NaN]);
-            const results = await index.search(query, 2);
-            
-            expect(results.distances.length).toBe(2);
-            expect(results.labels.length).toBe(2);
+            await expect(index.search(query, 2)).rejects.toThrow(InvalidVectorError);
             
             index.dispose();
         });

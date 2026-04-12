@@ -9,22 +9,24 @@ This guide explains how to trigger the build and release workflow to publish a n
 The workflow automatically triggers when you push a version tag:
 
 ```bash
-# 1. Update version in package.json (already done - 0.1.2)
+# 1. Update the release version locally
+# Example: 0.1.11
+
 # 2. Commit changes
 git add package.json Doxyfile README.md
-git commit -m "Bump version to 0.1.2"
+git commit -m "Release v<version>"
 
 # 3. Create and push version tag
-git tag v0.1.2
+git tag v<version>
 git push origin main
-git push origin v0.1.2
+git push origin v<version>
 ```
 
 **What happens automatically:**
 1. ✅ Builds on macOS arm64, macOS x64, and Linux x64
 2. ✅ Runs all tests on each platform
 3. ✅ Packages prebuilt binaries
-4. ✅ Publishes to npm as `@faiss-node/native@0.1.2`
+4. ✅ Publishes to npm as `@faiss-node/native@<version>`
 5. ✅ Creates GitHub release with binaries attached
 
 ### Method 2: Manual Trigger (GitHub UI)
@@ -55,7 +57,7 @@ Each build job:
 
 - **publish-npm** - Publishes to npm registry
   - Requires: `NPM_TOKEN` secret in GitHub repository settings
-  - Only runs if tag starts with `v` (e.g., `v0.1.2`)
+  - Only runs if tag starts with `v` (for example `v0.1.11`)
 
 ### Release Job (Only on Tag Push)
 
@@ -103,7 +105,7 @@ npm run ci:status
 ### Workflow Not Triggering
 
 **Issue:** Tag push didn't trigger workflow
-- **Solution:** Ensure tag format is `v*` (e.g., `v0.1.2`, not `0.1.2`)
+- **Solution:** Ensure tag format is `v*` (for example `v0.1.11`, not `0.1.11`)
 
 **Issue:** Manual trigger not available
 - **Solution:** Ensure you have write access to the repository
@@ -141,7 +143,7 @@ Before creating a release:
 
 ```bash
 # One-liner to release (after committing version bump)
-git tag v0.1.2 && git push origin main && git push origin v0.1.2
+git tag v<version> && git push origin main && git push origin v<version>
 ```
 
 ## What Gets Published
@@ -152,7 +154,7 @@ git tag v0.1.2 && git push origin main && git push origin v0.1.2
 - Includes: Source code, TypeScript definitions, README, LICENSE
 
 ### GitHub Release
-- Tag: `v0.1.2`
+- Tag: `v<version>`
 - Assets: Prebuilt binaries for macOS (arm64, x64) and Linux (x64)
 - Release notes: Auto-generated from tag
 
@@ -167,7 +169,7 @@ After successful release:
 
 2. **Test installation:**
    ```bash
-   npm install @faiss-node/native@0.1.2
+   npm install @faiss-node/native@<version>
    ```
 
 3. **Check GitHub release:**
@@ -175,5 +177,7 @@ After successful release:
    - Verify binaries are attached
 
 4. **Update documentation:**
-   - Documentation auto-deploys via `docs.yml` workflow
-   - Check: https://anupammaurya6767.github.io/faiss-node-native/
+   - Documentation auto-deploys from pushes to `main` via `docs.yml`
+   - Check the landing page: https://anupammaurya6767.github.io/faiss-node-native/
+   - Check TypeDoc: https://anupammaurya6767.github.io/faiss-node-native/api/
+   - Check Doxygen: https://anupammaurya6767.github.io/faiss-node-native/native/

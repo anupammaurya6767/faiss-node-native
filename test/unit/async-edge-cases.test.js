@@ -3,7 +3,7 @@
  * Tests race conditions, concurrent operations, and async-specific scenarios
  */
 
-const { FaissIndex } = require('../../src/js/index');
+const { FaissIndex, InvalidVectorError } = require('../../src/js/index');
 
 describe('Async Operations - Edge Cases (100+ cases)', () => {
     
@@ -664,30 +664,20 @@ describe('Async Operations - Edge Cases (100+ cases)', () => {
             index.dispose();
         });
 
-        test('async operations with NaN values', async () => {
+        test('async operations reject NaN values', async () => {
             const index = new FaissIndex({ dims: 4 });
             const vector = new Float32Array([NaN, 1, 2, 3]);
             
-            await index.add(vector);
-            expect(index.getStats().ntotal).toBe(1);
-            
-            const query = new Float32Array([NaN, 1, 2, 3]);
-            const results = await index.search(query, 1);
-            expect(results.distances.length).toBe(1);
+            await expect(index.add(vector)).rejects.toThrow(InvalidVectorError);
             
             index.dispose();
         });
 
-        test('async operations with Infinity values', async () => {
+        test('async operations reject Infinity values', async () => {
             const index = new FaissIndex({ dims: 4 });
             const vector = new Float32Array([Infinity, -Infinity, 1, 2]);
             
-            await index.add(vector);
-            expect(index.getStats().ntotal).toBe(1);
-            
-            const query = new Float32Array([Infinity, -Infinity, 1, 2]);
-            const results = await index.search(query, 1);
-            expect(results.distances.length).toBe(1);
+            await expect(index.add(vector)).rejects.toThrow(InvalidVectorError);
             
             index.dispose();
         });

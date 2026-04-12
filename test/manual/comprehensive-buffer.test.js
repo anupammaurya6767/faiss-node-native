@@ -3,7 +3,7 @@
  * 100+ test cases covering all edge cases, boundary conditions, and error scenarios
  */
 
-const { FaissIndex } = require('../../src/js/index');
+const { FaissIndex, ValidationError } = require('../../src/js/index');
 
 describe('ToBuffer/FromBuffer - Comprehensive Manual Tests (100+ cases)', () => {
     
@@ -140,14 +140,14 @@ describe('ToBuffer/FromBuffer - Comprehensive Manual Tests (100+ cases)', () => 
     
     describe('Invalid FromBuffer Operations', () => {
         test.each([
-            [null, TypeError, 'null buffer'],
-            [undefined, TypeError, 'undefined buffer'],
-            ['string', TypeError, 'string buffer'],
-            [123, TypeError, 'number buffer'],
-            [true, TypeError, 'boolean buffer'],
-            [[], TypeError, 'array buffer'],
-            [{}, TypeError, 'object buffer'],
-            [new Uint8Array(10), TypeError, 'Uint8Array'],
+            [null, ValidationError, 'null buffer'],
+            [undefined, ValidationError, 'undefined buffer'],
+            ['string', ValidationError, 'string buffer'],
+            [123, ValidationError, 'number buffer'],
+            [true, ValidationError, 'boolean buffer'],
+            [[], ValidationError, 'array buffer'],
+            [{}, ValidationError, 'object buffer'],
+            [new Uint8Array(10), ValidationError, 'Uint8Array'],
             [Buffer.alloc(0), Error, 'empty buffer'],
             [Buffer.alloc(10), Error, 'invalid buffer'],
         ])('throws %s for %s', async (buffer, errorType, description) => {

@@ -1,4 +1,4 @@
-const { FaissIndex } = require('../../src/js/index');
+const { FaissIndex, ValidationError } = require('../../src/js/index');
 
 describe('FaissIndex - Merge From', () => {
   const dims = 4;
@@ -75,8 +75,8 @@ describe('FaissIndex - Merge From', () => {
     test('throws on null/undefined otherIndex', async () => {
       const index = new FaissIndex({ dims });
       
-      await expect(index.mergeFrom(null)).rejects.toThrow(TypeError);
-      await expect(index.mergeFrom(undefined)).rejects.toThrow(TypeError);
+      await expect(index.mergeFrom(null)).rejects.toThrow(ValidationError);
+      await expect(index.mergeFrom(undefined)).rejects.toThrow(ValidationError);
       
       index.dispose();
     });

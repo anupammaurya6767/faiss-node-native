@@ -3,7 +3,7 @@
  * 100+ test cases covering all edge cases, boundary conditions, and error scenarios
  */
 
-const { FaissIndex } = require('../../src/js/index');
+const { FaissIndex, InvalidVectorError } = require('../../src/js/index');
 
 describe('Add Vectors - Comprehensive Manual Tests (100+ cases)', () => {
     
@@ -68,21 +68,21 @@ describe('Add Vectors - Comprehensive Manual Tests (100+ cases)', () => {
         });
 
         test.each([
-            [null, TypeError, 'null vectors'],
-            [undefined, TypeError, 'undefined vectors'],
-            ['string', TypeError, 'string vectors'],
-            [123, TypeError, 'number vectors'],
-            [true, TypeError, 'boolean vectors'],
-            [[], TypeError, 'empty array'],
-            [[0.1, 0.2, 0.3, 0.4], TypeError, 'regular array'],
-            [new Int32Array(4), TypeError, 'Int32Array'],
-            [new Uint8Array(4), TypeError, 'Uint8Array'],
-            [new ArrayBuffer(16), TypeError, 'ArrayBuffer'],
-            [{}, TypeError, 'object vectors'],
-            [() => {}, TypeError, 'function vectors'],
-            [new Map(), TypeError, 'map vectors'],
-            [new Set(), TypeError, 'set vectors'],
-            [Symbol('test'), TypeError, 'symbol vectors'],
+            [null, InvalidVectorError, 'null vectors'],
+            [undefined, InvalidVectorError, 'undefined vectors'],
+            ['string', InvalidVectorError, 'string vectors'],
+            [123, InvalidVectorError, 'number vectors'],
+            [true, InvalidVectorError, 'boolean vectors'],
+            [[], InvalidVectorError, 'empty array'],
+            [[0.1, 0.2, 0.3, 0.4], InvalidVectorError, 'regular array'],
+            [new Int32Array(4), InvalidVectorError, 'Int32Array'],
+            [new Uint8Array(4), InvalidVectorError, 'Uint8Array'],
+            [new ArrayBuffer(16), InvalidVectorError, 'ArrayBuffer'],
+            [{}, InvalidVectorError, 'object vectors'],
+            [() => {}, InvalidVectorError, 'function vectors'],
+            [new Map(), InvalidVectorError, 'map vectors'],
+            [new Set(), InvalidVectorError, 'set vectors'],
+            [Symbol('test'), InvalidVectorError, 'symbol vectors'],
         ])('throws %s for %s', async (vectors, errorType, description) => {
             await expect(index.add(vectors)).rejects.toThrow(errorType);
         });
@@ -245,19 +245,17 @@ describe('Add Vectors - Comprehensive Manual Tests (100+ cases)', () => {
             index.dispose();
         });
 
-        test('adds vectors with Infinity values', async () => {
+        test('rejects vectors with Infinity values', async () => {
             const index = new FaissIndex({ dims: 4 });
             const vectors = new Float32Array([Infinity, -Infinity, 1, 2]);
-            await index.add(vectors);
-            expect(index.getStats().ntotal).toBe(1);
+            await expect(index.add(vectors)).rejects.toThrow(InvalidVectorError);
             index.dispose();
         });
 
-        test('adds vectors with NaN values', async () => {
+        test('rejects vectors with NaN values', async () => {
             const index = new FaissIndex({ dims: 4 });
             const vectors = new Float32Array([NaN, 1, 2, 3]);
-            await index.add(vectors);
-            expect(index.getStats().ntotal).toBe(1);
+            await expect(index.add(vectors)).rejects.toThrow(InvalidVectorError);
             index.dispose();
         });
 

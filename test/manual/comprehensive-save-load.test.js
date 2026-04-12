@@ -3,7 +3,7 @@
  * 100+ test cases covering all edge cases, boundary conditions, and error scenarios
  */
 
-const { FaissIndex } = require('../../src/js/index');
+const { FaissIndex, ValidationError } = require('../../src/js/index');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -157,14 +157,14 @@ describe('Save/Load - Comprehensive Manual Tests (100+ cases)', () => {
         });
 
         test.each([
-            [null, TypeError, 'null filename'],
-            [undefined, TypeError, 'undefined filename'],
-            [123, TypeError, 'number filename'],
-            [true, TypeError, 'boolean filename'],
-            [[], TypeError, 'array filename'],
-            [{}, TypeError, 'object filename'],
-            ['', TypeError, 'empty string filename'],
-            [() => {}, TypeError, 'function filename'],
+            [null, ValidationError, 'null filename'],
+            [undefined, ValidationError, 'undefined filename'],
+            [123, ValidationError, 'number filename'],
+            [true, ValidationError, 'boolean filename'],
+            [[], ValidationError, 'array filename'],
+            [{}, ValidationError, 'object filename'],
+            ['', ValidationError, 'empty string filename'],
+            [() => {}, ValidationError, 'function filename'],
         ])('throws %s for %s', async (filename, errorType, description) => {
             await expect(index.save(filename)).rejects.toThrow(errorType);
         });
@@ -182,13 +182,13 @@ describe('Save/Load - Comprehensive Manual Tests (100+ cases)', () => {
     
     describe('Invalid Load Operations', () => {
         test.each([
-            [null, TypeError, 'null filename'],
-            [undefined, TypeError, 'undefined filename'],
-            [123, TypeError, 'number filename'],
-            [true, TypeError, 'boolean filename'],
-            [[], TypeError, 'array filename'],
-            [{}, TypeError, 'object filename'],
-            ['', TypeError, 'empty string filename'],
+            [null, ValidationError, 'null filename'],
+            [undefined, ValidationError, 'undefined filename'],
+            [123, ValidationError, 'number filename'],
+            [true, ValidationError, 'boolean filename'],
+            [[], ValidationError, 'array filename'],
+            [{}, ValidationError, 'object filename'],
+            ['', ValidationError, 'empty string filename'],
             ['nonexistent.idx', Error, 'nonexistent file'],
             ['/invalid/path/file.idx', Error, 'invalid path'],
         ])('throws %s for %s', async (filename, errorType, description) => {
