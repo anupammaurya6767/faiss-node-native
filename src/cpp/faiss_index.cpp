@@ -4,6 +4,7 @@
 #include <faiss/MetricType.h>
 #include <faiss/Index.h>
 #include <faiss/IndexFlat.h>
+#include <faiss/IndexHNSW.h>
 #include <faiss/IndexIVF.h>
 #include <faiss/index_factory.h>
 #include <faiss/index_io.h>
@@ -183,6 +184,27 @@ bool FaissIndexWrapper::IsTrained() const {
     return index_->is_trained;
 }
 
+std::string FaissIndexWrapper::GetIndexType() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (disposed_) {
+        return "UNKNOWN";
+    }
+
+    if (dynamic_cast<faiss::IndexHNSW*>(index_.get()) != nullptr) {
+        return "HNSW";
+    }
+
+    if (dynamic_cast<faiss::IndexIVF*>(index_.get()) != nullptr) {
+        return "IVF_FLAT";
+    }
+
+    if (dynamic_cast<faiss::IndexFlat*>(index_.get()) != nullptr) {
+        return index_->metric_type == faiss::METRIC_INNER_PRODUCT ? "FLAT_IP" : "FLAT_L2";
+    }
+
+    return "UNKNOWN";
+}
+
 void FaissIndexWrapper::Dispose() {
     std::lock_guard<std::mutex> lock(mutex_);
     if (disposed_) {
@@ -273,12 +295,11 @@ std::unique_ptr<FaissIndexWrapper> FaissIndexWrapper::FromBuffer(const uint8_t* 
 }
 
 void FaissIndexWrapper::MergeFrom(const FaissIndexWrapper& other) {
-    // Lock both mutexes to prevent deadlock (always lock in same order)
-    // We'll use a simple approach: lock this first, then other
-    // Note: This could deadlock if two threads merge in opposite directions
-    // In practice, this is unlikely, but we should document it
-    std::lock_guard<std::mutex> lock1(mutex_);
-    std::lock_guard<std::mutex> lock2(other.mutex_);
+    if (this == &other) {
+        throw std::invalid_argument("Cannot merge an index into itself");
+    }
+
+    std::scoped_lock lock(mutex_, other.mutex_);
     
     if (disposed_) {
         throw std::runtime_error("Index has been disposed");
@@ -293,10 +314,31 @@ void FaissIndexWrapper::MergeFrom(const FaissIndexWrapper& other) {
     }
     
     try {
-        // FAISS merge_from copies all vectors from other index
+        // FAISS merge_from transfers vectors from the source index into the target.
         index_->merge_from(*(other.index_));
     } catch (const std::exception& e) {
         throw std::runtime_error(std::string("Failed to merge index: ") + e.what());
+    }
+}
+
+void FaissIndexWrapper::SetHnswParams(int efConstruction, int efSearch) {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (disposed_) {
+        throw std::runtime_error("Index has been disposed");
+    }
+
+    faiss::IndexHNSW* hnsw_index = dynamic_cast<faiss::IndexHNSW*>(index_.get());
+    if (hnsw_index == nullptr) {
+        return;
+    }
+
+    if (efConstruction > 0) {
+        hnsw_index->hnsw.efConstruction = efConstruction;
+    }
+
+    if (efSearch > 0) {
+        hnsw_index->hnsw.efSearch = efSearch;
     }
 }
 

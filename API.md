@@ -24,8 +24,9 @@ Creates a new FAISS index with the specified configuration.
 
 **Parameters:**
 
-- `config.type` (string, required): Index type
+- `config.type` (string, optional): Index type (default: `'FLAT_L2'`)
   - `'FLAT_L2'` - Exact search, brute force
+  - `'FLAT_IP'` - Exact inner-product search
   - `'IVF_FLAT'` - Fast approximate search with clustering
   - `'HNSW'` - State-of-the-art approximate search
 - `config.dims` (number, required): Vector dimensions (must be positive integer)
@@ -34,6 +35,8 @@ Creates a new FAISS index with the specified configuration.
 - `config.M` (number, optional): Connections per node for HNSW (default: 16)
 - `config.efConstruction` (number, optional): HNSW construction parameter (default: 200)
 - `config.efSearch` (number, optional): HNSW search parameter (default: 50)
+
+Use `nlist` and `nprobe` only with `IVF_FLAT`, and use `M`, `efConstruction`, and `efSearch` only with `HNSW`.
 
 **Example:**
 
@@ -229,9 +232,9 @@ await ivfIndex.add(dataVectors);  // Now you can add vectors
 - `Error` if index is not IVF_FLAT
 - `Error` if index is disposed
 
-### setNprobe(nprobe: number): Promise<void>
+### setNprobe(nprobe: number): void
 
-Set the number of clusters to search for IVF_FLAT indexes.
+Set the number of clusters to search for IVF_FLAT indexes. Calling this on other index types has no effect.
 
 **Parameters:**
 - `nprobe` (number): Number of clusters to search (higher = more accurate, slower)
@@ -239,11 +242,11 @@ Set the number of clusters to search for IVF_FLAT indexes.
 **Example:**
 
 ```javascript
-await ivfIndex.setNprobe(20);  // Search more clusters
+ivfIndex.setNprobe(20);  // Search more clusters
 ```
 
 **Throws:**
-- `Error` if index is not IVF_FLAT
+- `TypeError` if `nprobe` is not a positive integer
 - `Error` if index is disposed
 
 ### getStats(): IndexStats
@@ -339,7 +342,7 @@ const index = await FaissIndex.fromBuffer(buffer);
 
 ### mergeFrom(otherIndex: FaissIndex): Promise<void>
 
-Merge vectors from another index into this index.
+Transfer vectors from another index into this index.
 
 **Parameters:**
 - `otherIndex` (FaissIndex): Index to merge from
@@ -354,7 +357,7 @@ await index1.add(vectors1);
 await index2.add(vectors2);
 
 await index1.mergeFrom(index2);  // index1 now contains vectors from both
-// Note: index2 is now empty (FAISS behavior)
+// Note: index2 is now empty after the transfer (FAISS behavior)
 ```
 
 **Throws:**

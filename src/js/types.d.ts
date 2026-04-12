@@ -3,7 +3,7 @@
  */
 
 export interface FaissIndexConfig {
-  type: 'FLAT_L2' | 'FLAT_IP' | 'IVF_FLAT' | 'HNSW';
+  type?: 'FLAT_L2' | 'FLAT_IP' | 'IVF_FLAT' | 'HNSW';
   dims: number;
   nlist?: number;
   nprobe?: number;
@@ -17,6 +17,11 @@ export interface FaissIndexConfig {
 export interface SearchResults {
   distances: Float32Array;
   labels: Int32Array;
+}
+
+export interface BatchSearchResults extends SearchResults {
+  nq: number;
+  k: number;
 }
 
 export interface RangeSearchResults {
@@ -37,9 +42,18 @@ export declare class FaissIndex {
   constructor(config: FaissIndexConfig);
   
   add(vectors: Float32Array, ids?: Int32Array): Promise<void>;
+  train(vectors: Float32Array): Promise<void>;
   search(query: Float32Array, k: number): Promise<SearchResults>;
+  searchBatch(queries: Float32Array, k: number): Promise<BatchSearchResults>;
   rangeSearch(query: Float32Array, radius: number): Promise<RangeSearchResults>;
+  setNprobe(nprobe: number): void;
   getStats(): IndexStats;
   reset(): void;
+  save(filename: string): Promise<void>;
+  toBuffer(): Promise<Buffer>;
+  mergeFrom(otherIndex: FaissIndex): Promise<void>;
   dispose(): void;
+
+  static load(filename: string): Promise<FaissIndex>;
+  static fromBuffer(buffer: Buffer): Promise<FaissIndex>;
 }

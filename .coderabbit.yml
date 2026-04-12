@@ -1,35 +1,23 @@
-# CodeRabbit configuration for faiss-node-native
-# Free for open source projects
+# CodeRabbit configuration file for faiss-node-native
 # https://coderabbit.ai
 
-language: "en"
+# The config is in YAML format
+# Note: This config file is optional - the defaults work well and designed for open source projects
 
-early_access: false
+language: "en"
 
 reviews:
   # Enable high-level summary of changes
   high_level_summary: true
-  high_level_summary_placeholder: "@coderabbitai summary"
 
-  # Enable poem generation (fun feature)
+  # Enable poem generation
   poem: true
 
-  # Review status checks
+  # Show status messages
   review_status: true
-
-  # Enable collapse and expand from specific lines
-  collapse_walkthrough: false
 
   # Configuration for sequence diagrams
   sequence_diagrams: true
-  path_filters:
-    - "!**/.env*"
-    - "!**/node_modules/"
-    - "!**/build/"
-    - "!**/dist/"
-    - "!**/.git/"
-    - "!**/*.lock"
-    - "!**/package-lock.json"
 
   # Auto-review settings
   auto_review:
@@ -42,133 +30,46 @@ reviews:
       - "main"
       - "develop"
 
-  # Enable path-based instructions for different file types
+  # Path filters to exclude files from review
+  path_filters:
+    - "!**/.env*"
+    - "!**/node_modules/"
+    - "!**/build/"
+    - "!**/dist/"
+    - "!**/.git/"
+    - "!**/*.lock"
+    - "!**/package-lock.json"
+
+  # Path-specific review instructions
   path_instructions:
     - path: "**/*.cpp"
-      instructions: |
+      instructions: >
         Review this C++ code with a focus on:
-        1. Memory management and resource leaks
-        2. Thread safety and mutex usage
-        3. N-API best practices for Node.js addons
-        4. Error handling and exception safety
-        5. Performance optimizations for vector operations
-        6. Proper cleanup in destructors
-        7. FAISS API usage correctness
-
-        Ensure:
-        - No raw pointers without proper RAII wrappers
-        - All FAISS resources are properly released
-        - Exception handling is compatible with N-API
-        - Code follows C++17 best practices
-        - Thread-safe operations are properly synchronized
-
-    - path: "**/*.h"
-      instructions: |
-        Review this C++ header file with a focus on:
-        1. Proper header guards
-        2. Forward declarations vs includes
-        3. Const correctness
-        4. API design clarity
-        5. Documentation completeness
-        6. Thread safety annotations
+        - Memory management and resource leaks
+        - Thread safety and mutex usage
+        - N-API best practices for Node.js addons
+        - Error handling and exception safety
+        - Proper cleanup in destructors
+        - FAISS API usage correctness
 
     - path: "src/js/**/*.js"
-      instructions: |
+      instructions: >
         Review this JavaScript code with a focus on:
-        1. Async/await error handling
-        2. Input validation and type checking
-        3. Native module boundary safety
-        4. Promise rejection handling
-        5. API ergonomics and developer experience
-        6. Proper resource cleanup
-
-        Ensure:
-        - All native calls have proper error handling
-        - Type checking before calling native methods
-        - Clear error messages for native module failures
-        - Promise chains are complete
-
-    - path: "test/**/*.js"
-      instructions: |
-        Review tests for:
-        1. Edge case coverage
-        2. Resource cleanup in tests
-        3. Async test handling
-        4. Memory leak detection
-        5. Integration test thoroughness
-        6. Performance test validity
+        - Async/await error handling
+        - Input validation and type checking
+        - Native module boundary safety
+        - Promise rejection handling
+        - API ergonomics and developer experience
+        - Proper resource cleanup
 
     - path: "binding.gyp"
-      instructions: |
+      instructions: >
         Review build configuration for:
-        1. Cross-platform compatibility
-        2. Correct library paths for FAISS
-        3. Proper compiler flags
-        4. N-API version consistency
-        5. Platform-specific linking
-
-    - path: "examples/**/*.js"
-      instructions: |
-        Review examples for:
-        1. Clarity and educational value
-        2. Best practice demonstration
-        3. Error handling patterns
-        4. Comments and explanations
-        5. Real-world applicability
-
-    - path: "*.md"
-      instructions: |
-        Review documentation for:
-        1. Accuracy of code examples
-        2. Clarity for new users
-        3. API documentation completeness
-        4. Migration guide correctness
-        5. Technical accuracy
-
-    - path: "package.json"
-      instructions: |
-        Review package.json for:
-        1. Dependency security
-        2. Semantic versioning compliance
-        3. Correct main/types entries
-        4. Scripts correctness
-        5. Metadata completeness
-
-  # Tools integration
-  tools:
-    eslint:
-      enabled: true
-      config_file: ".eslintrc.js"
-    shellcheck:
-      enabled: true
-    npm:
-      install:
-        - "faiss-node-native"
-
-# Enable knowledge base (future feature)
-knowledge_base:
-  opt_out: false
-  learnings:
-    - scope: "project_context"
-      description: "Native Node.js addon with C++ bindings to FAISS"
-      tags:
-        - "node-js"
-        - "native-addon"
-        - "cpp"
-        - "faiss"
-        - "vector-search"
-    - scope: "naming_patterns"
-      description: "Async methods use camelCase, sync methods are avoided"
-      tags:
-        - "async"
-        - "promises"
+        - Cross-platform compatibility
+        - Correct library paths for FAISS
+        - Proper compiler flags
+        - N-API version consistency
 
 # Chat configuration
 chat:
   auto_reply: true
-
-# Additional comments or notes
-comment:
-  - "Remember: This is a native addon - memory management is critical"
-  - "Thread safety is essential for production use"
-  - "Always check for proper cleanup of FAISS resources"
