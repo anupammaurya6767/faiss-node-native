@@ -202,7 +202,7 @@ std::string FaissIndexWrapper::GetIndexType() const {
         return index_->metric_type == faiss::METRIC_INNER_PRODUCT ? "FLAT_IP" : "FLAT_L2";
     }
 
-    return index_->metric_type == faiss::METRIC_INNER_PRODUCT ? "FLAT_IP" : "FLAT_L2";
+    return "UNKNOWN";
 }
 
 void FaissIndexWrapper::Dispose() {
@@ -295,6 +295,10 @@ std::unique_ptr<FaissIndexWrapper> FaissIndexWrapper::FromBuffer(const uint8_t* 
 }
 
 void FaissIndexWrapper::MergeFrom(const FaissIndexWrapper& other) {
+    if (this == &other) {
+        throw std::invalid_argument("Cannot merge an index into itself");
+    }
+
     std::scoped_lock lock(mutex_, other.mutex_);
     
     if (disposed_) {

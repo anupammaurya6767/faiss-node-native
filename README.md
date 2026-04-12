@@ -111,13 +111,15 @@ const index = new FaissIndex(config);
 ```
 
 **Parameters:**
-- `config.type` (string, required): Index type - `'FLAT_L2'`, `'IVF_FLAT'`, or `'HNSW'`
+- `config.type` (string, optional): Index type - `'FLAT_L2'`, `'FLAT_IP'`, `'IVF_FLAT'`, or `'HNSW'` (default: `'FLAT_L2'`)
 - `config.dims` (number, required): Vector dimensions (must be positive integer)
 - `config.nlist` (number, optional): Number of clusters for IVF_FLAT (default: 100)
 - `config.nprobe` (number, optional): Clusters to search for IVF_FLAT (default: 10)
 - `config.M` (number, optional): Connections per node for HNSW (default: 16)
 - `config.efConstruction` (number, optional): HNSW construction parameter (default: 200)
 - `config.efSearch` (number, optional): HNSW search parameter (default: 50)
+
+Use `nlist` and `nprobe` only with `IVF_FLAT`, and use `M`, `efConstruction`, and `efSearch` only with `HNSW`.
 
 **Examples:**
 
@@ -258,7 +260,7 @@ await ivfIndex.add(dataVectors);  // Now you can add vectors
 
 #### `setNprobe(nprobe: number): void`
 
-Set the number of clusters to search for IVF_FLAT indexes.
+Set the number of clusters to search for IVF_FLAT indexes. Calling this on other index types has no effect.
 
 ```javascript
 ivfIndex.setNprobe(20);  // Search more clusters (more accurate, slower)

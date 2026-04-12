@@ -502,8 +502,8 @@ FaissIndexWrapperJS::FaissIndexWrapperJS(const Napi::CallbackInfo& info)
         std::string indexDescription = "Flat";  // Default: IndexFlatL2
         int metric = 1;  // Default: METRIC_L2
         bool isHnsw = false;
-        int efConstruction = 0;
-        int efSearch = 0;
+        int efConstruction = 200;
+        int efSearch = 50;
         
         if (config.Has("type") && config.Get("type").IsString()) {
             std::string type = config.Get("type").As<Napi::String>().Utf8Value();

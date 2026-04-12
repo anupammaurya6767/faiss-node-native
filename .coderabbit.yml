@@ -40,8 +40,8 @@ reviews:
     - "!**/*.lock"
     - "!**/package-lock.json"
 
-  # Path-based instructions
-  path_based_instructions:
+  # Path-specific review instructions
+  path_instructions:
     - path: "**/*.cpp"
       instructions: >
         Review this C++ code with a focus on:

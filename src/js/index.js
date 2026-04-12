@@ -18,6 +18,27 @@ function validatePositiveInteger(name, value) {
     }
 }
 
+function validateIndexSpecificOptions(type, config) {
+    const ivfOnlyOptions = ['nlist', 'nprobe'];
+    const hnswOnlyOptions = ['M', 'efConstruction', 'efSearch'];
+
+    if (type !== 'IVF_FLAT') {
+        for (const key of ivfOnlyOptions) {
+            if (config[key] !== undefined) {
+                throw new TypeError(`${key} is only supported for IVF_FLAT indexes`);
+            }
+        }
+    }
+
+    if (type !== 'HNSW') {
+        for (const key of hnswOnlyOptions) {
+            if (config[key] !== undefined) {
+                throw new TypeError(`${key} is only supported for HNSW indexes`);
+            }
+        }
+    }
+}
+
 /**
  * FaissIndex - High-level JavaScript API for FAISS vector similarity search
  * 
@@ -38,15 +59,18 @@ class FaissIndex {
             throw new TypeError('Expected config object');
         }
         
-        // Validate index type
         const validTypes = ['FLAT_L2', 'FLAT_IP', 'IVF_FLAT', 'HNSW'];
         if (config.type && !validTypes.includes(config.type)) {
             throw new Error(`Index type '${config.type}' not supported. Supported types: ${validTypes.join(', ')}`);
         }
+
+        const indexType = config.type || 'FLAT_L2';
         
         if (!Number.isInteger(config.dims) || config.dims <= 0) {
             throw new TypeError('dims must be a positive integer');
         }
+
+        validateIndexSpecificOptions(indexType, config);
 
         for (const key of ['nlist', 'nprobe', 'M', 'efConstruction', 'efSearch']) {
             if (config[key] !== undefined) {
@@ -56,9 +80,7 @@ class FaissIndex {
         
         // Build config object for native wrapper
         const nativeConfig = { dims: config.dims };
-        if (config.type) {
-            nativeConfig.type = config.type;
-        }
+        nativeConfig.type = indexType;
         if (config.nlist !== undefined) {
             nativeConfig.nlist = config.nlist;
         }
@@ -77,7 +99,7 @@ class FaissIndex {
         
         this._native = new FaissIndexWrapper(nativeConfig);
         this._dims = config.dims;
-        this._type = config.type || 'FLAT_L2';
+        this._type = indexType;
     }
 
     _ensureActive() {
@@ -151,8 +173,8 @@ class FaissIndex {
      * @param {number} nprobe - Number of clusters to probe
      */
     setNprobe(nprobe) {
-        validatePositiveInteger('nprobe', nprobe);
         this._ensureActive();
+        validatePositiveInteger('nprobe', nprobe);
         
         try {
             this._native.setNprobe(nprobe);
