@@ -2,13 +2,14 @@
  * Example: sync vectors from PostgreSQL + pgvector into a FAISS index.
  *
  * Install dependency first:
- *   npm install pg
+ *   npm install pg pgvector
  *
  * This pattern is useful when pgvector is your source of truth and FAISS is the
  * low-latency in-memory serving layer.
  */
 
 const { Client } = require('pg');
+const pgvector = require('pgvector/pg');
 const { FaissIndex, normalizeVectors } = require('../src/js');
 
 const dims = 4;
@@ -19,6 +20,7 @@ async function main() {
   });
 
   await client.connect();
+  await pgvector.registerTypes(client);
   try {
     const { rows } = await client.query('SELECT id, embedding FROM documents ORDER BY id LIMIT 1000');
     const flattened = new Float32Array(rows.flatMap((row) => row.embedding));

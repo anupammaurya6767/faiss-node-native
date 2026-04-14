@@ -681,10 +681,16 @@ size_t FaissIndexWrapper::RemoveIds(const int64_t* ids, size_t n) {
         faiss::IndexIVF* ivf = FindIvfIndex(index_.get());
         const std::string message = e.what();
         if (ivf != nullptr && message.find("direct_map format") != std::string::npos) {
+            const auto previous_type = ivf->direct_map.type;
             ivf->set_direct_map_type(faiss::DirectMap::NoMap);
-            size_t removed = index_->remove_ids(selector);
-            ivf->set_direct_map_type(faiss::DirectMap::Hashtable);
-            return removed;
+            try {
+                size_t removed = index_->remove_ids(selector);
+                ivf->set_direct_map_type(faiss::DirectMap::Hashtable);
+                return removed;
+            } catch (...) {
+                ivf->set_direct_map_type(previous_type);
+                throw;
+            }
         }
         throw;
     }

@@ -630,10 +630,19 @@ size_t FaissBinaryIndexWrapper::RemoveIds(const int64_t* ids, size_t n) {
         faiss::IndexBinaryIVF* ivf = FindBinaryIvfIndex(index_.get());
         const std::string message = e.what();
         if (ivf != nullptr && message.find("direct_map format") != std::string::npos) {
+            const auto previous_type = ivf->direct_map.type;
             ivf->set_direct_map_type(faiss::DirectMap::NoMap);
-            size_t removed = index_->remove_ids(selector);
-            ivf->set_direct_map_type(faiss::DirectMap::Hashtable);
-            return removed;
+            try {
+                size_t removed = index_->remove_ids(selector);
+                // Preserve removal support after fallback: Array direct maps only
+                // work with contiguous ids, so we intentionally switch to
+                // Hashtable after remove_ids() mutates the id layout.
+                ivf->set_direct_map_type(faiss::DirectMap::Hashtable);
+                return removed;
+            } catch (...) {
+                ivf->set_direct_map_type(previous_type);
+                throw;
+            }
         }
         throw;
     }

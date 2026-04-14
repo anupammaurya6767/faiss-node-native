@@ -112,8 +112,11 @@ async function readFloat32File(filename, dims) {
     throw new Error(`File ${filename} is not a valid Float32 buffer`);
   }
 
-  const floatArray = new Float32Array(buffer.buffer, buffer.byteOffset, buffer.byteLength / 4);
-  const data = new Float32Array(floatArray);
+  const dataView = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  const data = new Float32Array(buffer.byteLength / 4);
+  for (let i = 0; i < data.length; i++) {
+    data[i] = dataView.getFloat32(i * 4, true);
+  }
   if (data.length % dims !== 0) {
     throw new Error(
       `Float32 data length (${data.length}) in ${filename} must be a multiple of dims (${dims})`
