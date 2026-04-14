@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for building FAISS-Node
-FROM node:18-bookworm AS builder
+FROM node:25-bookworm AS builder
 
 WORKDIR /app
 
@@ -74,7 +74,7 @@ RUN echo "=== Testing native module load ===" && \
 RUN npm run test:ci
 
 # Production stage
-FROM node:18-bookworm-slim AS production
+FROM node:25-bookworm-slim AS production
 
 WORKDIR /app
 
