@@ -106,7 +106,7 @@
   "devDependencies": {
     "express": "^4.22.1",
     "jest": "^29.7.0",
-    "typedoc": "^0.25.0"
+    "typedoc": "^0.28.19"
   },
   "dependencies": {
     "node-addon-api": "^7.0.0"
