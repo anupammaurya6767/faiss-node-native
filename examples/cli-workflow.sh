@@ -8,6 +8,7 @@ VECTORS_PATH="./tmp/example-vectors.bin"
 QUERY_PATH="./tmp/example-query.bin"
 
 mkdir -p ./tmp
+rm -f "$INDEX_PATH" "${INDEX_PATH}.meta.json" "$VECTORS_PATH" "$QUERY_PATH"
 
 node - <<'NODE'
 const fs = require('fs');

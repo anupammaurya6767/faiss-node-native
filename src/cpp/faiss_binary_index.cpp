@@ -493,13 +493,13 @@ std::unique_ptr<FaissBinaryIndexWrapper> FaissBinaryIndexWrapper::Load(const std
     }
 
     try {
-        faiss::IndexBinary* loaded_index = faiss::read_index_binary(filename.c_str());
-        EnableSequentialDirectMap(loaded_index);
+        std::unique_ptr<faiss::IndexBinary> loaded_index(faiss::read_index_binary(filename.c_str()));
+        EnableSequentialDirectMap(loaded_index.get());
 
         auto wrapper = std::make_unique<FaissBinaryIndexWrapper>(static_cast<int>(loaded_index->d));
-        wrapper->index_.reset(loaded_index);
-        wrapper->dims_ = static_cast<int>(loaded_index->d);
-        wrapper->type_label_ = InferBinaryIndexType(loaded_index);
+        wrapper->index_ = std::move(loaded_index);
+        wrapper->dims_ = static_cast<int>(wrapper->index_->d);
+        wrapper->type_label_ = InferBinaryIndexType(wrapper->index_.get());
         wrapper->factory_description_.clear();
 
         return wrapper;
@@ -545,13 +545,13 @@ std::unique_ptr<FaissBinaryIndexWrapper> FaissBinaryIndexWrapper::FromBuffer(
         faiss::VectorIOReader reader;
         reader.data.assign(data, data + length);
 
-        faiss::IndexBinary* loaded_index = faiss::read_index_binary(&reader);
-        EnableSequentialDirectMap(loaded_index);
+        std::unique_ptr<faiss::IndexBinary> loaded_index(faiss::read_index_binary(&reader));
+        EnableSequentialDirectMap(loaded_index.get());
 
         auto wrapper = std::make_unique<FaissBinaryIndexWrapper>(static_cast<int>(loaded_index->d));
-        wrapper->index_.reset(loaded_index);
-        wrapper->dims_ = static_cast<int>(loaded_index->d);
-        wrapper->type_label_ = InferBinaryIndexType(loaded_index);
+        wrapper->index_ = std::move(loaded_index);
+        wrapper->dims_ = static_cast<int>(wrapper->index_->d);
+        wrapper->type_label_ = InferBinaryIndexType(wrapper->index_.get());
         wrapper->factory_description_.clear();
 
         return wrapper;

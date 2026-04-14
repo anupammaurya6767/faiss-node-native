@@ -103,7 +103,14 @@ describe('Index Creation - Comprehensive Manual Tests (100+ cases)', () => {
             [{ dims: NaN }, ValidationError, 'NaN dims'],
         ])('throws error for %s', (config, errorType, description) => {
             if (Array.isArray(errorType)) {
-                expect(() => new FaissIndex(config)).toThrow();
+                let thrownError;
+                try {
+                    new FaissIndex(config);
+                } catch (error) {
+                    thrownError = error;
+                }
+                expect(thrownError).toBeDefined();
+                expect(errorType.some((allowedType) => thrownError instanceof allowedType || thrownError.name === allowedType.name)).toBe(true);
             } else {
                 expect(() => new FaissIndex(config)).toThrow(errorType);
             }

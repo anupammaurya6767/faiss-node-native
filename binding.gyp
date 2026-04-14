@@ -70,23 +70,22 @@
             "<!@(node -p \"require('node-addon-api').include\")",
             "src/cpp",
             "/usr/local/cuda/include",
-            "/usr/local/cuda/targets/x86_64-linux/include",
             "/usr/local/include",
             "/usr/include"
           ],
           "libraries": [
             "-L/usr/local/lib",
             "-L/usr/lib",
-            "<!@(bash -lc 'for dir in /usr/local/cuda/lib64 /usr/local/cuda/targets/x86_64-linux/lib; do if [ -d \"$dir\" ]; then printf -- \"-L%s\\n\" \"$dir\"; fi; done')",
+            "-L/usr/local/cuda/lib64",
             "-lfaiss",
             "-lopenblas",
             "-lgomp",
-            "<!@(bash -lc 'if [ -e /usr/local/cuda/lib64/libcudart.so ] || [ -e /usr/local/cuda/targets/x86_64-linux/lib/libcudart.so ]; then printf -- \"-lcudart\\n\"; fi; if [ -e /usr/local/cuda/lib64/libcublas.so ] || [ -e /usr/local/cuda/targets/x86_64-linux/lib/libcublas.so ]; then printf -- \"-lcublas\\n\"; fi')"
+            "<!@(bash -lc 'cuda_lib_found() { for dir in /usr/local/cuda/lib64 /usr/local/cuda/targets/x86_64-linux/lib /usr/local/cuda/targets/aarch64-linux/lib; do if [ -e \"$dir/$1\" ]; then return 0; fi; done; return 1; }; if cuda_lib_found libcudart.so; then printf -- \"-lcudart\\n\"; fi; if cuda_lib_found libcublas.so; then printf -- \"-lcublas\\n\"; fi')"
           ],
           "ldflags": [
             "-L/usr/local/lib",
             "-L/usr/lib",
-            "-Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu:/usr/local/cuda/lib64:/usr/local/cuda/targets/x86_64-linux/lib"
+            "-Wl,-rpath,/usr/local/lib:/usr/local/cuda/lib64"
           ],
           "cflags_cc": [
             "-std=c++17",
@@ -94,6 +93,30 @@
             "-frtti",
             "-fopenmp",
             "-I/usr/local/include"
+          ],
+          "conditions": [
+            ["target_arch=='x64'", {
+              "include_dirs": [
+                "/usr/local/cuda/targets/x86_64-linux/include"
+              ],
+              "libraries": [
+                "-L/usr/local/cuda/targets/x86_64-linux/lib"
+              ],
+              "ldflags": [
+                "-Wl,-rpath,/usr/lib/x86_64-linux-gnu:/usr/local/cuda/targets/x86_64-linux/lib"
+              ]
+            }],
+            ["target_arch=='arm64'", {
+              "include_dirs": [
+                "/usr/local/cuda/targets/aarch64-linux/include"
+              ],
+              "libraries": [
+                "-L/usr/local/cuda/targets/aarch64-linux/lib"
+              ],
+              "ldflags": [
+                "-Wl,-rpath,/usr/lib/aarch64-linux-gnu:/usr/local/cuda/targets/aarch64-linux/lib"
+              ]
+            }]
           ]
         }],
         ["OS=='win'", {

@@ -141,7 +141,7 @@ function wrapNativeError(error, context = {}) {
 }
 
 function ensureUint8Array(name, value) {
-  if (!(value instanceof Uint8Array)) {
+  if (!ArrayBuffer.isView(value) || Object.prototype.toString.call(value) !== '[object Uint8Array]') {
     throw new BinaryVectorError(`${name} must be a Uint8Array`);
   }
 }
@@ -735,7 +735,14 @@ class FaissBinaryIndex {
           passed: report.valid,
           message: `sampleIds=${sampleIds.join(',')}`,
         });
+        valid = valid && report.valid;
       } catch (error) {
+        valid = false;
+        checks.push({
+          name: 'reconstructBatch',
+          passed: false,
+          message: error.message,
+        });
         warnings.push(`Could not reconstruct sample vectors: ${error.message}`);
       }
 
@@ -750,6 +757,12 @@ class FaissBinaryIndex {
         });
         valid = valid && passed;
       } catch (error) {
+        valid = false;
+        checks.push({
+          name: 'selfSearch',
+          passed: false,
+          message: error.message,
+        });
         warnings.push(`Could not run validation search: ${error.message}`);
       }
     }

@@ -348,7 +348,7 @@ void FaissIndexWrapper::SetNprobe(int nprobe) {
     
     // Try to cast to IndexIVF to set nprobe
     // This is safe even if not an IVF index (will just do nothing)
-    faiss::IndexIVF* ivf_index = dynamic_cast<faiss::IndexIVF*>(index_.get());
+    faiss::IndexIVF* ivf_index = FindIvfIndex(index_.get());
     if (ivf_index) {
         ivf_index->nprobe = nprobe;
     }
@@ -393,12 +393,12 @@ void FaissIndexWrapper::Dispose() {
     }
     
     disposed_ = true;
+    index_.reset();
 #ifdef FAISS_NODE_HAVE_GPU
-    gpu_resources_.reset();
     gpu_resident_ = false;
     gpu_device_ = -1;
+    gpu_resources_.reset();
 #endif
-    index_.reset();
 }
 
 void FaissIndexWrapper::Save(const std::string& filename) const {

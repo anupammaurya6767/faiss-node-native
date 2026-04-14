@@ -15,6 +15,56 @@ class FaissIndexWrapperJS;
 // Async Workers for Non-Blocking Operations
 // ============================================================================
 
+class GpuTransferWorker : public Napi::AsyncWorker {
+public:
+    GpuTransferWorker(
+            const Napi::Object& owner,
+            FaissIndexWrapper* wrapper,
+            bool toGpu,
+            int device,
+            Napi::Promise::Deferred deferred)
+        : Napi::AsyncWorker(deferred.Env(), toGpu ? "ToGpuWorker" : "ToCpuWorker"),
+          owner_ref_(Napi::Persistent(owner)),
+          wrapper_(wrapper),
+          to_gpu_(toGpu),
+          device_(device),
+          deferred_(deferred) {}
+
+    void Execute() override {
+        try {
+            if (wrapper_->IsDisposed()) {
+                SetError("Index has been disposed");
+                return;
+            }
+
+            if (to_gpu_) {
+                wrapper_->ToGpu(device_);
+            } else {
+                wrapper_->ToCpu();
+            }
+        } catch (const std::exception& e) {
+            SetError(std::string("FAISS error: ") + e.what());
+        }
+    }
+
+    void OnOK() override {
+        owner_ref_.Reset();
+        deferred_.Resolve(Env().Undefined());
+    }
+
+    void OnError(const Napi::Error& e) override {
+        owner_ref_.Reset();
+        deferred_.Reject(e.Value());
+    }
+
+private:
+    Napi::ObjectReference owner_ref_;
+    FaissIndexWrapper* wrapper_;
+    bool to_gpu_;
+    int device_;
+    Napi::Promise::Deferred deferred_;
+};
+
 // Add Worker
 class AddWorker : public Napi::AsyncWorker {
 public:
@@ -962,8 +1012,10 @@ Napi::Value FaissIndexWrapperJS::ToGpu(const Napi::CallbackInfo& info) {
             }
         }
 
-        wrapper_->ToGpu(device);
-        return env.Undefined();
+        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
+        GpuTransferWorker* worker = new GpuTransferWorker(Value(), wrapper_.get(), true, device, deferred);
+        worker->Queue();
+        return deferred.Promise();
     } catch (const Napi::Error& e) {
         throw;
     } catch (const std::exception& e) {
@@ -978,8 +1030,11 @@ Napi::Value FaissIndexWrapperJS::ToCpu(const Napi::CallbackInfo& info) {
 
     try {
         ValidateNotDisposed(env);
-        wrapper_->ToCpu();
-        return env.Undefined();
+
+        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
+        GpuTransferWorker* worker = new GpuTransferWorker(Value(), wrapper_.get(), false, 0, deferred);
+        worker->Queue();
+        return deferred.Promise();
     } catch (const Napi::Error& e) {
         throw;
     } catch (const std::exception& e) {

@@ -74,7 +74,9 @@ describe('Enhanced index operations', () => {
 describe('Metrics, validation, and progress helpers', () => {
   test('records operation metrics and returns validation report', async () => {
     const index = new FaissIndex({ type: 'PQ', dims: 8, pqSegments: 2, pqBits: 4, collectMetrics: true });
-    const trainingVectors = new Float32Array(Array.from({ length: 8 * 64 }, (_, i) => ((i % 8) + (Math.floor(i / 8) % 7)) / 11));
+    const trainingVectors = new Float32Array(
+      Array.from({ length: 8 * 640 }, (_, i) => ((i % 8) + (Math.floor(i / 8) % 17)) / 19)
+    );
 
     await index.train(trainingVectors);
     await index.add(trainingVectors.subarray(0, 8 * 16));

@@ -178,6 +178,7 @@ After successful release:
 
 4. **Update documentation:**
    - Documentation auto-deploys from pushes to `main` via `docs.yml`
+   - Check docs workflow runs: https://github.com/anupammaurya6767/faiss-node-native/actions/workflows/docs.yml
    - Check the landing page: https://anupammaurya6767.github.io/faiss-node-native/
    - Check TypeDoc: https://anupammaurya6767.github.io/faiss-node-native/api/
    - Check Doxygen: https://anupammaurya6767.github.io/faiss-node-native/native/

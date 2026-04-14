@@ -8,19 +8,65 @@
 #include "faiss_binary_index.h"
 #include "napi_binary_bindings.h"
 
-class BinaryAddWorker : public Napi::AsyncWorker {
+class BinaryOwnedAsyncWorker : public Napi::AsyncWorker {
+public:
+    BinaryOwnedAsyncWorker(
+            const Napi::Object& owner,
+            Napi::Promise::Deferred deferred,
+            const char* name)
+        : Napi::AsyncWorker(deferred.Env(), name),
+          owner_ref_(Napi::Persistent(owner)),
+          deferred_(deferred) {}
+
+protected:
+    void ReleaseOwner() {
+        owner_ref_.Reset();
+    }
+
+private:
+    Napi::ObjectReference owner_ref_;
+protected:
+    Napi::Promise::Deferred deferred_;
+};
+
+class BinaryDualOwnedAsyncWorker : public Napi::AsyncWorker {
+public:
+    BinaryDualOwnedAsyncWorker(
+            const Napi::Object& primaryOwner,
+            const Napi::Object& secondaryOwner,
+            Napi::Promise::Deferred deferred,
+            const char* name)
+        : Napi::AsyncWorker(deferred.Env(), name),
+          primary_owner_ref_(Napi::Persistent(primaryOwner)),
+          secondary_owner_ref_(Napi::Persistent(secondaryOwner)),
+          deferred_(deferred) {}
+
+protected:
+    void ReleaseOwners() {
+        primary_owner_ref_.Reset();
+        secondary_owner_ref_.Reset();
+    }
+
+private:
+    Napi::ObjectReference primary_owner_ref_;
+    Napi::ObjectReference secondary_owner_ref_;
+protected:
+    Napi::Promise::Deferred deferred_;
+};
+
+class BinaryAddWorker : public BinaryOwnedAsyncWorker {
 public:
     BinaryAddWorker(
+            const Napi::Object& owner,
             FaissBinaryIndexWrapper* wrapper,
             const uint8_t* vectors,
             size_t n,
             int codeSize,
             Napi::Promise::Deferred deferred)
-        : Napi::AsyncWorker(deferred.Env(), "BinaryAddWorker"),
+        : BinaryOwnedAsyncWorker(owner, deferred, "BinaryAddWorker"),
           wrapper_(wrapper),
           vectors_(vectors, vectors + n * static_cast<size_t>(codeSize)),
-          n_(n),
-          deferred_(deferred) {}
+          n_(n) {}
 
     void Execute() override {
         try {
@@ -35,10 +81,12 @@ public:
     }
 
     void OnOK() override {
+        ReleaseOwner();
         deferred_.Resolve(Env().Undefined());
     }
 
     void OnError(const Napi::Error& e) override {
+        ReleaseOwner();
         deferred_.Reject(e.Value());
     }
 
@@ -46,22 +94,21 @@ private:
     FaissBinaryIndexWrapper* wrapper_;
     std::vector<uint8_t> vectors_;
     size_t n_;
-    Napi::Promise::Deferred deferred_;
 };
 
-class BinaryTrainWorker : public Napi::AsyncWorker {
+class BinaryTrainWorker : public BinaryOwnedAsyncWorker {
 public:
     BinaryTrainWorker(
+            const Napi::Object& owner,
             FaissBinaryIndexWrapper* wrapper,
             const uint8_t* vectors,
             size_t n,
             int codeSize,
             Napi::Promise::Deferred deferred)
-        : Napi::AsyncWorker(deferred.Env(), "BinaryTrainWorker"),
+        : BinaryOwnedAsyncWorker(owner, deferred, "BinaryTrainWorker"),
           wrapper_(wrapper),
           vectors_(vectors, vectors + n * static_cast<size_t>(codeSize)),
-          n_(n),
-          deferred_(deferred) {}
+          n_(n) {}
 
     void Execute() override {
         try {
@@ -76,10 +123,12 @@ public:
     }
 
     void OnOK() override {
+        ReleaseOwner();
         deferred_.Resolve(Env().Undefined());
     }
 
     void OnError(const Napi::Error& e) override {
+        ReleaseOwner();
         deferred_.Reject(e.Value());
     }
 
@@ -87,22 +136,21 @@ private:
     FaissBinaryIndexWrapper* wrapper_;
     std::vector<uint8_t> vectors_;
     size_t n_;
-    Napi::Promise::Deferred deferred_;
 };
 
-class BinarySearchWorker : public Napi::AsyncWorker {
+class BinarySearchWorker : public BinaryOwnedAsyncWorker {
 public:
     BinarySearchWorker(
+            const Napi::Object& owner,
             FaissBinaryIndexWrapper* wrapper,
             const uint8_t* query,
             int codeSize,
             int k,
             Napi::Promise::Deferred deferred)
-        : Napi::AsyncWorker(deferred.Env(), "BinarySearchWorker"),
+        : BinaryOwnedAsyncWorker(owner, deferred, "BinarySearchWorker"),
           wrapper_(wrapper),
           query_(query, query + codeSize),
-          k_(k),
-          deferred_(deferred) {}
+          k_(k) {}
 
     void Execute() override {
         try {
@@ -141,10 +189,12 @@ public:
 
         result.Set("distances", distances);
         result.Set("labels", labels);
+        ReleaseOwner();
         deferred_.Resolve(result);
     }
 
     void OnError(const Napi::Error& e) override {
+        ReleaseOwner();
         deferred_.Reject(e.Value());
     }
 
@@ -154,24 +204,23 @@ private:
     int k_;
     std::vector<int32_t> distances_;
     std::vector<faiss::idx_t> labels_;
-    Napi::Promise::Deferred deferred_;
 };
 
-class BinarySearchBatchWorker : public Napi::AsyncWorker {
+class BinarySearchBatchWorker : public BinaryOwnedAsyncWorker {
 public:
     BinarySearchBatchWorker(
+            const Napi::Object& owner,
             FaissBinaryIndexWrapper* wrapper,
             const uint8_t* queries,
             size_t nq,
             int codeSize,
             int k,
             Napi::Promise::Deferred deferred)
-        : Napi::AsyncWorker(deferred.Env(), "BinarySearchBatchWorker"),
+        : BinaryOwnedAsyncWorker(owner, deferred, "BinarySearchBatchWorker"),
           wrapper_(wrapper),
           queries_(queries, queries + nq * static_cast<size_t>(codeSize)),
           nq_(nq),
-          k_(k),
-          deferred_(deferred) {}
+          k_(k) {}
 
     void Execute() override {
         try {
@@ -217,10 +266,12 @@ public:
         result.Set("labels", labels);
         result.Set("nq", Napi::Number::New(env, nq_));
         result.Set("k", Napi::Number::New(env, static_cast<int>(distances_.size() / nq_)));
+        ReleaseOwner();
         deferred_.Resolve(result);
     }
 
     void OnError(const Napi::Error& e) override {
+        ReleaseOwner();
         deferred_.Reject(e.Value());
     }
 
@@ -231,19 +282,18 @@ private:
     int k_;
     std::vector<int32_t> distances_;
     std::vector<faiss::idx_t> labels_;
-    Napi::Promise::Deferred deferred_;
 };
 
-class BinaryReconstructWorker : public Napi::AsyncWorker {
+class BinaryReconstructWorker : public BinaryOwnedAsyncWorker {
 public:
     BinaryReconstructWorker(
+            const Napi::Object& owner,
             FaissBinaryIndexWrapper* wrapper,
             int64_t id,
             Napi::Promise::Deferred deferred)
-        : Napi::AsyncWorker(deferred.Env(), "BinaryReconstructWorker"),
+        : BinaryOwnedAsyncWorker(owner, deferred, "BinaryReconstructWorker"),
           wrapper_(wrapper),
-          id_(id),
-          deferred_(deferred) {}
+          id_(id) {}
 
     void Execute() override {
         try {
@@ -263,10 +313,12 @@ public:
         Napi::Env env = Env();
         Napi::Uint8Array result = Napi::Uint8Array::New(env, output_.size());
         memcpy(result.Data(), output_.data(), output_.size() * sizeof(uint8_t));
+        ReleaseOwner();
         deferred_.Resolve(result);
     }
 
     void OnError(const Napi::Error& e) override {
+        ReleaseOwner();
         deferred_.Reject(e.Value());
     }
 
@@ -274,20 +326,19 @@ private:
     FaissBinaryIndexWrapper* wrapper_;
     int64_t id_;
     std::vector<uint8_t> output_;
-    Napi::Promise::Deferred deferred_;
 };
 
-class BinaryReconstructBatchWorker : public Napi::AsyncWorker {
+class BinaryReconstructBatchWorker : public BinaryOwnedAsyncWorker {
 public:
     BinaryReconstructBatchWorker(
+            const Napi::Object& owner,
             FaissBinaryIndexWrapper* wrapper,
             const int32_t* ids,
             size_t n,
             Napi::Promise::Deferred deferred)
-        : Napi::AsyncWorker(deferred.Env(), "BinaryReconstructBatchWorker"),
+        : BinaryOwnedAsyncWorker(owner, deferred, "BinaryReconstructBatchWorker"),
           wrapper_(wrapper),
-          ids_(ids, ids + n),
-          deferred_(deferred) {}
+          ids_(ids, ids + n) {}
 
     void Execute() override {
         try {
@@ -308,10 +359,12 @@ public:
         Napi::Env env = Env();
         Napi::Uint8Array result = Napi::Uint8Array::New(env, output_.size());
         memcpy(result.Data(), output_.data(), output_.size() * sizeof(uint8_t));
+        ReleaseOwner();
         deferred_.Resolve(result);
     }
 
     void OnError(const Napi::Error& e) override {
+        ReleaseOwner();
         deferred_.Reject(e.Value());
     }
 
@@ -319,21 +372,20 @@ private:
     FaissBinaryIndexWrapper* wrapper_;
     std::vector<int32_t> ids_;
     std::vector<uint8_t> output_;
-    Napi::Promise::Deferred deferred_;
 };
 
-class BinaryRemoveIdsWorker : public Napi::AsyncWorker {
+class BinaryRemoveIdsWorker : public BinaryOwnedAsyncWorker {
 public:
     BinaryRemoveIdsWorker(
+            const Napi::Object& owner,
             FaissBinaryIndexWrapper* wrapper,
             const int32_t* ids,
             size_t n,
             Napi::Promise::Deferred deferred)
-        : Napi::AsyncWorker(deferred.Env(), "BinaryRemoveIdsWorker"),
+        : BinaryOwnedAsyncWorker(owner, deferred, "BinaryRemoveIdsWorker"),
           wrapper_(wrapper),
           ids_(ids, ids + n),
-          removed_(0),
-          deferred_(deferred) {}
+          removed_(0) {}
 
     void Execute() override {
         try {
@@ -350,10 +402,12 @@ public:
     }
 
     void OnOK() override {
+        ReleaseOwner();
         deferred_.Resolve(Napi::Number::New(Env(), removed_));
     }
 
     void OnError(const Napi::Error& e) override {
+        ReleaseOwner();
         deferred_.Reject(e.Value());
     }
 
@@ -361,19 +415,18 @@ private:
     FaissBinaryIndexWrapper* wrapper_;
     std::vector<int32_t> ids_;
     size_t removed_;
-    Napi::Promise::Deferred deferred_;
 };
 
-class BinarySaveWorker : public Napi::AsyncWorker {
+class BinarySaveWorker : public BinaryOwnedAsyncWorker {
 public:
     BinarySaveWorker(
+            const Napi::Object& owner,
             FaissBinaryIndexWrapper* wrapper,
             const std::string& filename,
             Napi::Promise::Deferred deferred)
-        : Napi::AsyncWorker(deferred.Env(), "BinarySaveWorker"),
+        : BinaryOwnedAsyncWorker(owner, deferred, "BinarySaveWorker"),
           wrapper_(wrapper),
-          filename_(filename),
-          deferred_(deferred) {}
+          filename_(filename) {}
 
     void Execute() override {
         try {
@@ -388,25 +441,28 @@ public:
     }
 
     void OnOK() override {
+        ReleaseOwner();
         deferred_.Resolve(Env().Undefined());
     }
 
     void OnError(const Napi::Error& e) override {
+        ReleaseOwner();
         deferred_.Reject(e.Value());
     }
 
 private:
     FaissBinaryIndexWrapper* wrapper_;
     std::string filename_;
-    Napi::Promise::Deferred deferred_;
 };
 
-class BinaryToBufferWorker : public Napi::AsyncWorker {
+class BinaryToBufferWorker : public BinaryOwnedAsyncWorker {
 public:
-    BinaryToBufferWorker(FaissBinaryIndexWrapper* wrapper, Napi::Promise::Deferred deferred)
-        : Napi::AsyncWorker(deferred.Env(), "BinaryToBufferWorker"),
-          wrapper_(wrapper),
-          deferred_(deferred) {}
+    BinaryToBufferWorker(
+            const Napi::Object& owner,
+            FaissBinaryIndexWrapper* wrapper,
+            Napi::Promise::Deferred deferred)
+        : BinaryOwnedAsyncWorker(owner, deferred, "BinaryToBufferWorker"),
+          wrapper_(wrapper) {}
 
     void Execute() override {
         try {
@@ -423,29 +479,31 @@ public:
     void OnOK() override {
         Napi::Env env = Env();
         Napi::Buffer<uint8_t> nodeBuffer = Napi::Buffer<uint8_t>::Copy(env, buffer_.data(), buffer_.size());
+        ReleaseOwner();
         deferred_.Resolve(nodeBuffer);
     }
 
     void OnError(const Napi::Error& e) override {
+        ReleaseOwner();
         deferred_.Reject(e.Value());
     }
 
 private:
     FaissBinaryIndexWrapper* wrapper_;
     std::vector<uint8_t> buffer_;
-    Napi::Promise::Deferred deferred_;
 };
 
-class BinaryMergeFromWorker : public Napi::AsyncWorker {
+class BinaryMergeFromWorker : public BinaryDualOwnedAsyncWorker {
 public:
     BinaryMergeFromWorker(
+            const Napi::Object& targetOwner,
             FaissBinaryIndexWrapper* target,
+            const Napi::Object& sourceOwner,
             FaissBinaryIndexWrapper* source,
             Napi::Promise::Deferred deferred)
-        : Napi::AsyncWorker(deferred.Env(), "BinaryMergeFromWorker"),
+        : BinaryDualOwnedAsyncWorker(targetOwner, sourceOwner, deferred, "BinaryMergeFromWorker"),
           target_(target),
-          source_(source),
-          deferred_(deferred) {}
+          source_(source) {}
 
     void Execute() override {
         try {
@@ -464,17 +522,18 @@ public:
     }
 
     void OnOK() override {
+        ReleaseOwners();
         deferred_.Resolve(Env().Undefined());
     }
 
     void OnError(const Napi::Error& e) override {
+        ReleaseOwners();
         deferred_.Reject(e.Value());
     }
 
 private:
     FaissBinaryIndexWrapper* target_;
     FaissBinaryIndexWrapper* source_;
-    Napi::Promise::Deferred deferred_;
 };
 
 class FaissBinaryIndexWrapperJS : public Napi::ObjectWrap<FaissBinaryIndexWrapperJS> {
@@ -724,7 +783,13 @@ Napi::Value FaissBinaryIndexWrapperJS::Add(const Napi::CallbackInfo& info) {
         size_t n = length / codeSize;
         Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
         BinaryAddWorker* worker =
-            new BinaryAddWorker(wrapper_.get(), vectorArr.Data(), n, static_cast<int>(codeSize), deferred);
+            new BinaryAddWorker(
+                Value(),
+                wrapper_.get(),
+                vectorArr.Data(),
+                n,
+                static_cast<int>(codeSize),
+                deferred);
         worker->Queue();
 
         return deferred.Promise();
@@ -770,7 +835,13 @@ Napi::Value FaissBinaryIndexWrapperJS::Train(const Napi::CallbackInfo& info) {
         size_t n = length / codeSize;
         Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
         BinaryTrainWorker* worker =
-            new BinaryTrainWorker(wrapper_.get(), vectorArr.Data(), n, static_cast<int>(codeSize), deferred);
+            new BinaryTrainWorker(
+                Value(),
+                wrapper_.get(),
+                vectorArr.Data(),
+                n,
+                static_cast<int>(codeSize),
+                deferred);
         worker->Queue();
 
         return deferred.Promise();
@@ -823,7 +894,13 @@ Napi::Value FaissBinaryIndexWrapperJS::Search(const Napi::CallbackInfo& info) {
 
         Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
         BinarySearchWorker* worker =
-            new BinarySearchWorker(wrapper_.get(), queryArr.Data(), static_cast<int>(codeSize), k, deferred);
+            new BinarySearchWorker(
+                Value(),
+                wrapper_.get(),
+                queryArr.Data(),
+                static_cast<int>(codeSize),
+                k,
+                deferred);
         worker->Queue();
 
         return deferred.Promise();
@@ -882,6 +959,7 @@ Napi::Value FaissBinaryIndexWrapperJS::SearchBatch(const Napi::CallbackInfo& inf
         size_t nq = totalBytes / codeSize;
         Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
         BinarySearchBatchWorker* worker = new BinarySearchBatchWorker(
+            Value(),
             wrapper_.get(),
             queriesArr.Data(),
             nq,
@@ -920,7 +998,7 @@ Napi::Value FaissBinaryIndexWrapperJS::Reconstruct(const Napi::CallbackInfo& inf
         }
 
         Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
-        BinaryReconstructWorker* worker = new BinaryReconstructWorker(wrapper_.get(), id, deferred);
+        BinaryReconstructWorker* worker = new BinaryReconstructWorker(Value(), wrapper_.get(), id, deferred);
         worker->Queue();
         return deferred.Promise();
     } catch (const Napi::Error& e) {
@@ -964,7 +1042,12 @@ Napi::Value FaissBinaryIndexWrapperJS::ReconstructBatch(const Napi::CallbackInfo
 
         Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
         BinaryReconstructBatchWorker* worker =
-            new BinaryReconstructBatchWorker(wrapper_.get(), idsArr.Data(), idsArr.ElementLength(), deferred);
+            new BinaryReconstructBatchWorker(
+                Value(),
+                wrapper_.get(),
+                idsArr.Data(),
+                idsArr.ElementLength(),
+                deferred);
         worker->Queue();
 
         return deferred.Promise();
@@ -1009,7 +1092,12 @@ Napi::Value FaissBinaryIndexWrapperJS::RemoveIds(const Napi::CallbackInfo& info)
 
         Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
         BinaryRemoveIdsWorker* worker =
-            new BinaryRemoveIdsWorker(wrapper_.get(), idsArr.Data(), idsArr.ElementLength(), deferred);
+            new BinaryRemoveIdsWorker(
+                Value(),
+                wrapper_.get(),
+                idsArr.Data(),
+                idsArr.ElementLength(),
+                deferred);
         worker->Queue();
 
         return deferred.Promise();
@@ -1071,7 +1159,7 @@ Napi::Value FaissBinaryIndexWrapperJS::Save(const Napi::CallbackInfo& info) {
 
         std::string filename = info[0].As<Napi::String>().Utf8Value();
         Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
-        BinarySaveWorker* worker = new BinarySaveWorker(wrapper_.get(), filename, deferred);
+        BinarySaveWorker* worker = new BinarySaveWorker(Value(), wrapper_.get(), filename, deferred);
         worker->Queue();
 
         return deferred.Promise();
@@ -1091,7 +1179,7 @@ Napi::Value FaissBinaryIndexWrapperJS::ToBuffer(const Napi::CallbackInfo& info) 
         ValidateNotDisposed(env);
 
         Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
-        BinaryToBufferWorker* worker = new BinaryToBufferWorker(wrapper_.get(), deferred);
+        BinaryToBufferWorker* worker = new BinaryToBufferWorker(Value(), wrapper_.get(), deferred);
         worker->Queue();
 
         return deferred.Promise();
@@ -1132,7 +1220,12 @@ Napi::Value FaissBinaryIndexWrapperJS::MergeFrom(const Napi::CallbackInfo& info)
 
         Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
         BinaryMergeFromWorker* worker =
-            new BinaryMergeFromWorker(wrapper_.get(), otherInstance->wrapper_.get(), deferred);
+            new BinaryMergeFromWorker(
+                Value(),
+                wrapper_.get(),
+                otherInstance->Value(),
+                otherInstance->wrapper_.get(),
+                deferred);
         worker->Queue();
 
         return deferred.Promise();

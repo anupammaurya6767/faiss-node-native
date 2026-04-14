@@ -392,7 +392,10 @@ async function handleAdd(options) {
 async function handleSearch(options) {
   const indexPath = getRequiredOption(options, 'index');
   const filePath = getRequiredOption(options, 'query');
-  const k = parseIntegerOption(options, 'k');
+  const k = parseIntegerOption(options, 'k', null);
+  if (k === null) {
+    throw new Error('Missing required option --k');
+  }
   const index = await loadIndex(indexPath, options);
   const stats = index.getStats();
   const isBinary = stats.metric === 'hamming';

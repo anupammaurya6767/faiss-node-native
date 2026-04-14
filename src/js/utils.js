@@ -4,6 +4,35 @@ const {
   BinaryVectorError,
 } = require('./errors');
 
+/**
+ * @typedef {Object} ValidateVectorsOptions
+ * @property {boolean} [throwOnError=false]
+ */
+
+/**
+ * @typedef {Object} NonFiniteVectorEntry
+ * @property {number} vectorIndex
+ * @property {number} componentIndex
+ * @property {number} value
+ */
+
+/**
+ * @typedef {Object} VectorValidationReport
+ * @property {boolean} valid
+ * @property {number} vectorCount
+ * @property {number} dims
+ * @property {boolean} hasNaNOrInfinity
+ * @property {NonFiniteVectorEntry[]} nonFinite
+ * @property {number[]} zeroNormIndices
+ * @property {number[]} invalidDimensions
+ */
+
+/**
+ * @typedef {Object} DistanceOptions
+ * @property {number} dims
+ * @property {'l2' | 'ip' | 'cosine'} [metric='l2']
+ */
+
 function ensurePositiveInteger(name, value) {
   if (!Number.isInteger(value) || value <= 0) {
     throw new TypeError(`${name} must be a positive integer`);
@@ -11,13 +40,13 @@ function ensurePositiveInteger(name, value) {
 }
 
 function ensureFloat32Array(name, value) {
-  if (!(value instanceof Float32Array)) {
+  if (!ArrayBuffer.isView(value) || Object.prototype.toString.call(value) !== '[object Float32Array]') {
     throw new TypeError(`${name} must be a Float32Array`);
   }
 }
 
 function ensureUint8Array(name, value) {
-  if (!(value instanceof Uint8Array)) {
+  if (!ArrayBuffer.isView(value) || Object.prototype.toString.call(value) !== '[object Uint8Array]') {
     throw new TypeError(`${name} must be a Uint8Array`);
   }
 }
@@ -33,6 +62,13 @@ function getVectorCount(length, dims) {
   return length / dims;
 }
 
+/**
+ * L2-normalize one or more float vectors.
+ *
+ * @param {Float32Array} vectors
+ * @param {number} dims
+ * @returns {Float32Array}
+ */
 function normalizeVectors(vectors, dims) {
   ensureFloat32Array('vectors', vectors);
   const count = getVectorCount(vectors.length, dims);
@@ -65,6 +101,14 @@ function normalizeVectors(vectors, dims) {
   return normalized;
 }
 
+/**
+ * Validate one or more float vectors.
+ *
+ * @param {Float32Array} vectors
+ * @param {number} dims
+ * @param {ValidateVectorsOptions} [options={}]
+ * @returns {VectorValidationReport}
+ */
 function validateVectors(vectors, dims, options = {}) {
   ensureFloat32Array('vectors', vectors);
   const count = getVectorCount(vectors.length, dims);
@@ -110,6 +154,14 @@ function validateVectors(vectors, dims, options = {}) {
   return report;
 }
 
+/**
+ * Split float vectors into chunks by vector count.
+ *
+ * @param {Float32Array} vectors
+ * @param {number} dims
+ * @param {number} chunkSize
+ * @returns {Float32Array[]}
+ */
 function splitVectors(vectors, dims, chunkSize) {
   ensureFloat32Array('vectors', vectors);
   ensurePositiveInteger('chunkSize', chunkSize);
@@ -124,6 +176,17 @@ function splitVectors(vectors, dims, chunkSize) {
   return chunks;
 }
 
+/**
+ * Compute pairwise distances or similarities between float vectors.
+ *
+ * Supports one-to-one comparisons or broadcasting when either side contains a
+ * single vector.
+ *
+ * @param {Float32Array} left
+ * @param {Float32Array} right
+ * @param {DistanceOptions} options
+ * @returns {Float32Array}
+ */
 function computeDistances(left, right, options = {}) {
   ensureFloat32Array('left', left);
   ensureFloat32Array('right', right);
@@ -184,6 +247,13 @@ function computeDistances(left, right, options = {}) {
   return distances;
 }
 
+/**
+ * Validate one or more binary vectors packed into a Uint8Array.
+ *
+ * @param {Uint8Array} vectors
+ * @param {number} dims
+ * @returns {{ valid: true, dims: number, vectorCount: number, bytesPerVector: number }}
+ */
 function validateBinaryVectors(vectors, dims) {
   ensureUint8Array('vectors', vectors);
   ensurePositiveInteger('dims', dims);

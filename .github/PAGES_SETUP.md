@@ -54,12 +54,12 @@ The workflow (`.github/workflows/docs.yml`) I created triggers on:
 ### Documentation URL
 
 After first deployment, your docs will be available at:
-```
+```text
 https://<username>.github.io/<repo>/
 ```
 
 For example:
-```
+```text
 https://anupammaurya6767.github.io/faiss-node-native/
 ```
 

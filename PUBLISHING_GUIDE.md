@@ -47,7 +47,7 @@ cd /tmp
 mkdir test-package-install
 cd test-package-install
 npm init -y
-npm install /path/to/faiss-node/faiss-node-native-<version>.tgz
+npm install /path/to/faiss-node-native/faiss-node-native-<version>.tgz
 node -e "const { FaissIndex } = require('@faiss-node/native'); console.log('✅ Package works!');"
 ```
 

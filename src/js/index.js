@@ -287,7 +287,7 @@ function wrapNativeError(error, context = {}) {
 }
 
 function ensureFloat32Array(name, value) {
-  if (!(value instanceof Float32Array)) {
+  if (!ArrayBuffer.isView(value) || Object.prototype.toString.call(value) !== '[object Float32Array]') {
     throw new InvalidVectorError(`${name} must be a Float32Array`);
   }
 }
@@ -746,6 +746,12 @@ class FaissIndex {
           warnings.push('Sampled reconstructions contained invalid values.');
         }
       } catch (error) {
+        valid = false;
+        checks.push({
+          name: 'reconstructBatch',
+          passed: false,
+          message: error.message,
+        });
         warnings.push(`Could not reconstruct sample vectors: ${error.message}`);
       }
 
@@ -760,6 +766,12 @@ class FaissIndex {
         });
         valid = valid && passed;
       } catch (error) {
+        valid = false;
+        checks.push({
+          name: 'selfSearch',
+          passed: false,
+          message: error.message,
+        });
         warnings.push(`Could not run validation search: ${error.message}`);
       }
     }
@@ -847,8 +859,8 @@ class FaissIndex {
       throw new ValidationError('device must be a non-negative integer', { details: { device } });
     }
 
-    return this._runSync('toGpu', () => {
-      this._native.toGpu(device);
+    return this._runAsync('toGpu', async () => {
+      await this._native.toGpu(device);
       this._syncStats(this._native.getStats());
       return this;
     }, {
@@ -859,8 +871,8 @@ class FaissIndex {
 
   async toCpu() {
     this._ensureActive();
-    return this._runSync('toCpu', () => {
-      this._native.toCpu();
+    return this._runAsync('toCpu', async () => {
+      await this._native.toCpu();
       this._syncStats(this._native.getStats());
       return this;
     });

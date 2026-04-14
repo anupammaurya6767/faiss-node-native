@@ -25,18 +25,22 @@ async function main() {
   ];
 
   const index = new FaissIndex({ type: 'FLAT_IP', dims: 4 });
-  await index.add(normalizeVectors(itemEmbeddings, 4));
+  try {
+    await index.add(normalizeVectors(itemEmbeddings, 4));
 
-  const userPreference = normalizeVectors(new Float32Array([
-    0.93, 0.07, 0.02, 0.00,
-  ]), 4);
+    const userPreference = normalizeVectors(new Float32Array([
+      0.93, 0.07, 0.02, 0.00,
+    ]), 4);
 
-  const results = await index.search(userPreference, 3);
+    const results = await index.search(userPreference, 3);
 
-  console.log('Top recommendations:');
-  for (let i = 0; i < results.labels.length; i++) {
-    const label = results.labels[i];
-    console.log(`${i + 1}. ${itemNames[label]} (score=${results.distances[i].toFixed(4)})`);
+    console.log('Top recommendations:');
+    for (let i = 0; i < results.labels.length; i++) {
+      const label = results.labels[i];
+      console.log(`${i + 1}. ${itemNames[label]} (score=${results.distances[i].toFixed(4)})`);
+    }
+  } finally {
+    index.dispose();
   }
 }
 
