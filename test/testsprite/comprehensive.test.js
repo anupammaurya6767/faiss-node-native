@@ -11,7 +11,11 @@
  * - Memory safety
  */
 
-const { FaissIndex } = require('../../src/js/index');
+const {
+  FaissIndex,
+  ValidationError,
+  InvalidVectorError,
+} = require('../../src/js/index');
 
 describe('FaissIndex - Comprehensive Test Suite', () => {
   
@@ -39,19 +43,19 @@ describe('FaissIndex - Comprehensive Test Suite', () => {
 
     describe('Invalid Configurations', () => {
       test.each([
-        [null, TypeError, 'null config'],
-        [undefined, TypeError, 'undefined config'],
-        ['string', TypeError, 'string config'],
-        [123, TypeError, 'number config'],
-        [[], TypeError, 'array config'],
-        [{}, TypeError, 'empty object'],
-        [{ dims: null }, TypeError, 'null dims'],
-        [{ dims: undefined }, TypeError, 'undefined dims'],
-        [{ dims: '128' }, TypeError, 'string dims'],
-        [{ dims: 128.5 }, TypeError, 'float dims'],
-        [{ dims: -1 }, TypeError, 'negative dims'],
-        [{ dims: 0 }, TypeError, 'zero dims'],
-        [{ dims: -100 }, TypeError, 'large negative'],
+        [null, ValidationError, 'null config'],
+        [undefined, ValidationError, 'undefined config'],
+        ['string', ValidationError, 'string config'],
+        [123, ValidationError, 'number config'],
+        [[], ValidationError, 'array config'],
+        [{}, ValidationError, 'empty object'],
+        [{ dims: null }, ValidationError, 'null dims'],
+        [{ dims: undefined }, ValidationError, 'undefined dims'],
+        [{ dims: '128' }, ValidationError, 'string dims'],
+        [{ dims: 128.5 }, ValidationError, 'float dims'],
+        [{ dims: -1 }, ValidationError, 'negative dims'],
+        [{ dims: 0 }, ValidationError, 'zero dims'],
+        [{ dims: -100 }, ValidationError, 'large negative'],
         [{ dims: Number.MAX_SAFE_INTEGER + 1 }, [Error, RangeError], 'unsafe integer'], // C++ throws RangeError
         [{ type: 'INVALID', dims: 128 }, Error, 'invalid type'],
         [{ type: '', dims: 128 }, undefined, 'empty type string'], // Empty string doesn't match check, so it works
@@ -117,15 +121,15 @@ describe('FaissIndex - Comprehensive Test Suite', () => {
 
     describe('Invalid Vector Inputs', () => {
       test.each([
-        [null, TypeError],
-        [undefined, TypeError],
-        ['string', TypeError],
-        [123, TypeError],
-        [[1, 2, 3, 4], TypeError],
-        [{}, TypeError],
-        [new Array(4), TypeError],
-        [new Int32Array([1, 2, 3, 4]), TypeError],
-        [new Uint8Array([1, 2, 3, 4]), TypeError],
+        [null, InvalidVectorError],
+        [undefined, InvalidVectorError],
+        ['string', InvalidVectorError],
+        [123, InvalidVectorError],
+        [[1, 2, 3, 4], InvalidVectorError],
+        [{}, InvalidVectorError],
+        [new Array(4), InvalidVectorError],
+        [new Int32Array([1, 2, 3, 4]), InvalidVectorError],
+        [new Uint8Array([1, 2, 3, 4]), InvalidVectorError],
         [new Float32Array([]), Error],
         [new Float32Array([1, 2, 3]), Error], // Not multiple of 4
         [new Float32Array([1, 2, 3, 4, 5]), Error], // Not multiple of 4
@@ -140,16 +144,22 @@ describe('FaissIndex - Comprehensive Test Suite', () => {
         [new Float32Array([0, 0, 0, 0]), 'zero vector'],
         [new Float32Array([1, 1, 1, 1]), 'all ones'],
         [new Float32Array([-1, -1, -1, -1]), 'all negative'],
-        [new Float32Array([NaN, 0, 0, 0]), 'NaN value'],
-        [new Float32Array([Infinity, 0, 0, 0]), 'Infinity value'],
-        [new Float32Array([-Infinity, 0, 0, 0]), 'negative Infinity'],
-        [new Float32Array([Number.MAX_VALUE, 0, 0, 0]), 'max value'],
-        [new Float32Array([Number.MIN_VALUE, 0, 0, 0]), 'min value'],
+        [new Float32Array([3e38, 0, 0, 0]), 'max finite-ish value'],
+        [new Float32Array([1e-37, 0, 0, 0]), 'min finite-ish value'],
         [new Float32Array([1e-10, 1e-10, 1e-10, 1e-10]), 'very small values'],
         [new Float32Array([1e10, 1e10, 1e10, 1e10]), 'very large values'],
       ])('handles %s', async (vector, description) => {
         await expect(index.add(vector)).resolves.not.toThrow();
         expect(index.getStats().ntotal).toBe(1);
+      });
+
+      test.each([
+        [new Float32Array([NaN, 0, 0, 0]), 'NaN value'],
+        [new Float32Array([Infinity, 0, 0, 0]), 'Infinity value'],
+        [new Float32Array([-Infinity, 0, 0, 0]), 'negative Infinity'],
+        [new Float32Array([Number.MAX_VALUE, 0, 0, 0]), 'overflow to Infinity'],
+      ])('rejects %s', async (vector, description) => {
+        await expect(index.add(vector)).rejects.toThrow(InvalidVectorError);
       });
     });
 
@@ -235,20 +245,20 @@ describe('FaissIndex - Comprehensive Test Suite', () => {
 
     describe('Invalid Query Inputs', () => {
       test.each([
-        [null, 1, TypeError],
-        [undefined, 1, TypeError],
-        ['string', 1, TypeError],
-        [123, 1, TypeError],
-        [[1, 0, 0, 0], 1, TypeError],
+        [null, 1, InvalidVectorError],
+        [undefined, 1, InvalidVectorError],
+        ['string', 1, InvalidVectorError],
+        [123, 1, InvalidVectorError],
+        [[1, 0, 0, 0], 1, InvalidVectorError],
         [new Float32Array([1, 0, 0]), 1, Error], // Wrong length
         [new Float32Array([1, 0, 0, 0, 0]), 1, Error], // Wrong length
-        [new Float32Array([1, 0, 0, 0]), null, TypeError],
-        [new Float32Array([1, 0, 0, 0]), undefined, TypeError],
-        [new Float32Array([1, 0, 0, 0]), '1', TypeError],
-        [new Float32Array([1, 0, 0, 0]), 1.5, TypeError],
-        [new Float32Array([1, 0, 0, 0]), 0, TypeError],
-        [new Float32Array([1, 0, 0, 0]), -1, TypeError],
-        [new Float32Array([1, 0, 0, 0]), -100, TypeError],
+        [new Float32Array([1, 0, 0, 0]), null, ValidationError],
+        [new Float32Array([1, 0, 0, 0]), undefined, ValidationError],
+        [new Float32Array([1, 0, 0, 0]), '1', ValidationError],
+        [new Float32Array([1, 0, 0, 0]), 1.5, ValidationError],
+        [new Float32Array([1, 0, 0, 0]), 0, ValidationError],
+        [new Float32Array([1, 0, 0, 0]), -1, ValidationError],
+        [new Float32Array([1, 0, 0, 0]), -100, ValidationError],
       ])('throws %s for invalid query: %s, k: %s', async (query, k, errorType) => {
         await expect(index.search(query, k)).rejects.toThrow(errorType);
       });

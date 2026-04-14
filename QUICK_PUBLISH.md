@@ -11,7 +11,7 @@ This shows what will be published WITHOUT actually publishing.
 ### Step 2: Verify Everything Looks Good
 Check the output - should show:
 - ✅ Package name: `@faiss-node/native`
-- ✅ Version: `0.1.0`
+- ✅ Version: the version you intend to release
 - ✅ Author: Your name
 - ✅ Description: Looks good
 - ✅ Files: Only necessary files (no test/, .github/, etc.)

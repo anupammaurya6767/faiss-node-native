@@ -1,31 +1,38 @@
 # Documentation
 
-This directory contains the auto-generated API documentation that I set up using Doxygen.
+This repository publishes two documentation views:
 
-## Viewing Documentation
+- **GitHub Pages home**: [Documentation Home](https://anupammaurya6767.github.io/faiss-node-native/)
+- **JS/TS API**: [TypeDoc](https://anupammaurya6767.github.io/faiss-node-native/api/)
+- **C++ native API**: [Doxygen](https://anupammaurya6767.github.io/faiss-node-native/native/)
 
-- **Online**: Visit [GitHub Pages](https://anupammaurya6767.github.io/faiss-node-native/) (automatically deployed)
-- **Local**: Run `npm run docs:serve` and visit http://localhost:8000
-
-## Generating Documentation
+## Generate locally
 
 ```bash
 npm run docs
 ```
 
-This generates HTML documentation in `docs/html/` using Doxygen.
+That command generates:
 
-## Documentation Structure
+- `docs/api/` for TypeDoc output
+- `docs/html/` for Doxygen output
 
-- **C++ API**: Native bindings and FAISS wrapper classes
-- **JavaScript API**: High-level FaissIndex class
-- **Examples**: Code examples from `examples/` directory
+## Preview locally
 
-## Auto-Deployment
+```bash
+npm run docs:serve
+npm run docs:serve:cpp
+```
 
-I've set it up so documentation automatically deploys to GitHub Pages when:
-- Code is pushed to `main` branch
-- Source files (`src/**`) or `Doxyfile` are modified
-- I manually trigger it via workflow_dispatch
+- `docs:serve` serves the JS/TS docs at `http://localhost:8000`
+- `docs:serve:cpp` serves the C++ docs at `http://localhost:8001`
 
-See `.github/workflows/docs.yml` for the deployment workflow I created.
+## Deployment
+
+GitHub Pages is published through GitHub Actions. The Pages workflow builds both documentation sets, stages a small landing page, and publishes:
+
+- `/` as the documentation home page
+- `/api/` for TypeDoc
+- `/native/` for Doxygen
+
+See `.github/workflows/docs.yml` for the main deployment workflow.

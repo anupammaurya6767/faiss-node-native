@@ -3,7 +3,7 @@
  * 100+ test cases covering all edge cases, boundary conditions, and error scenarios
  */
 
-const { FaissIndex } = require('../../src/js/index');
+const { FaissIndex, ValidationError } = require('../../src/js/index');
 
 describe('MergeFrom - Comprehensive Manual Tests (100+ cases)', () => {
     
@@ -103,14 +103,14 @@ describe('MergeFrom - Comprehensive Manual Tests (100+ cases)', () => {
     
     describe('Invalid Merge Operations', () => {
         test.each([
-            [null, TypeError, 'null index'],
-            [undefined, TypeError, 'undefined index'],
-            ['string', TypeError, 'string index'],
-            [123, TypeError, 'number index'],
-            [true, TypeError, 'boolean index'],
-            [[], TypeError, 'array index'],
-            [{}, TypeError, 'object index'],
-            [() => {}, TypeError, 'function index'],
+            [null, ValidationError, 'null index'],
+            [undefined, ValidationError, 'undefined index'],
+            ['string', ValidationError, 'string index'],
+            [123, ValidationError, 'number index'],
+            [true, ValidationError, 'boolean index'],
+            [[], ValidationError, 'array index'],
+            [{}, ValidationError, 'object index'],
+            [() => {}, ValidationError, 'function index'],
         ])('throws %s for %s', async (otherIndex, errorType, description) => {
             const index = new FaissIndex({ dims: 4 });
             await expect(index.mergeFrom(otherIndex)).rejects.toThrow(errorType);

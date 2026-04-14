@@ -2,6 +2,7 @@
 // Include FAISS headers for idx_t
 #include <faiss/MetricType.h>
 #include "faiss_index.h"
+#include "napi_binary_bindings.h"
 #include <vector>
 #include <memory>
 #include <cstring>
@@ -13,6 +14,56 @@ class FaissIndexWrapperJS;
 // ============================================================================
 // Async Workers for Non-Blocking Operations
 // ============================================================================
+
+class GpuTransferWorker : public Napi::AsyncWorker {
+public:
+    GpuTransferWorker(
+            const Napi::Object& owner,
+            FaissIndexWrapper* wrapper,
+            bool toGpu,
+            int device,
+            Napi::Promise::Deferred deferred)
+        : Napi::AsyncWorker(deferred.Env(), toGpu ? "ToGpuWorker" : "ToCpuWorker"),
+          owner_ref_(Napi::Persistent(owner)),
+          wrapper_(wrapper),
+          to_gpu_(toGpu),
+          device_(device),
+          deferred_(deferred) {}
+
+    void Execute() override {
+        try {
+            if (wrapper_->IsDisposed()) {
+                SetError("Index has been disposed");
+                return;
+            }
+
+            if (to_gpu_) {
+                wrapper_->ToGpu(device_);
+            } else {
+                wrapper_->ToCpu();
+            }
+        } catch (const std::exception& e) {
+            SetError(std::string("FAISS error: ") + e.what());
+        }
+    }
+
+    void OnOK() override {
+        owner_ref_.Reset();
+        deferred_.Resolve(Env().Undefined());
+    }
+
+    void OnError(const Napi::Error& e) override {
+        owner_ref_.Reset();
+        deferred_.Reject(e.Value());
+    }
+
+private:
+    Napi::ObjectReference owner_ref_;
+    FaissIndexWrapper* wrapper_;
+    bool to_gpu_;
+    int device_;
+    Napi::Promise::Deferred deferred_;
+};
 
 // Add Worker
 class AddWorker : public Napi::AsyncWorker {
@@ -295,6 +346,131 @@ private:
     Napi::Promise::Deferred deferred_;
 };
 
+// Reconstruct Worker
+class ReconstructWorker : public Napi::AsyncWorker {
+public:
+    ReconstructWorker(FaissIndexWrapper* wrapper, int64_t id, Napi::Promise::Deferred deferred)
+        : Napi::AsyncWorker(deferred.Env(), "ReconstructWorker"),
+          wrapper_(wrapper),
+          id_(id),
+          deferred_(deferred) {
+    }
+
+    void Execute() override {
+        try {
+            if (wrapper_->IsDisposed()) {
+                SetError("Index has been disposed");
+                return;
+            }
+
+            output_.resize(wrapper_->GetDimensions());
+            wrapper_->Reconstruct(id_, output_.data());
+        } catch (const std::exception& e) {
+            SetError(std::string("FAISS error: ") + e.what());
+        }
+    }
+
+    void OnOK() override {
+        Napi::Env env = Env();
+        Napi::Float32Array result = Napi::Float32Array::New(env, output_.size());
+        memcpy(result.Data(), output_.data(), output_.size() * sizeof(float));
+        deferred_.Resolve(result);
+    }
+
+    void OnError(const Napi::Error& e) override {
+        deferred_.Reject(e.Value());
+    }
+
+private:
+    FaissIndexWrapper* wrapper_;
+    int64_t id_;
+    std::vector<float> output_;
+    Napi::Promise::Deferred deferred_;
+};
+
+// ReconstructBatch Worker
+class ReconstructBatchWorker : public Napi::AsyncWorker {
+public:
+    ReconstructBatchWorker(FaissIndexWrapper* wrapper, const int32_t* ids, size_t n, Napi::Promise::Deferred deferred)
+        : Napi::AsyncWorker(deferred.Env(), "ReconstructBatchWorker"),
+          wrapper_(wrapper),
+          ids_(ids, ids + n),
+          deferred_(deferred) {
+    }
+
+    void Execute() override {
+        try {
+            if (wrapper_->IsDisposed()) {
+                SetError("Index has been disposed");
+                return;
+            }
+
+            output_.resize(ids_.size() * static_cast<size_t>(wrapper_->GetDimensions()));
+            std::vector<int64_t> ids64(ids_.begin(), ids_.end());
+            wrapper_->ReconstructBatch(ids64.data(), ids64.size(), output_.data());
+        } catch (const std::exception& e) {
+            SetError(std::string("FAISS error: ") + e.what());
+        }
+    }
+
+    void OnOK() override {
+        Napi::Env env = Env();
+        Napi::Float32Array result = Napi::Float32Array::New(env, output_.size());
+        memcpy(result.Data(), output_.data(), output_.size() * sizeof(float));
+        deferred_.Resolve(result);
+    }
+
+    void OnError(const Napi::Error& e) override {
+        deferred_.Reject(e.Value());
+    }
+
+private:
+    FaissIndexWrapper* wrapper_;
+    std::vector<int32_t> ids_;
+    std::vector<float> output_;
+    Napi::Promise::Deferred deferred_;
+};
+
+// RemoveIds Worker
+class RemoveIdsWorker : public Napi::AsyncWorker {
+public:
+    RemoveIdsWorker(FaissIndexWrapper* wrapper, const int32_t* ids, size_t n, Napi::Promise::Deferred deferred)
+        : Napi::AsyncWorker(deferred.Env(), "RemoveIdsWorker"),
+          wrapper_(wrapper),
+          ids_(ids, ids + n),
+          removed_(0),
+          deferred_(deferred) {
+    }
+
+    void Execute() override {
+        try {
+            if (wrapper_->IsDisposed()) {
+                SetError("Index has been disposed");
+                return;
+            }
+
+            std::vector<int64_t> ids64(ids_.begin(), ids_.end());
+            removed_ = wrapper_->RemoveIds(ids64.data(), ids64.size());
+        } catch (const std::exception& e) {
+            SetError(std::string("FAISS error: ") + e.what());
+        }
+    }
+
+    void OnOK() override {
+        deferred_.Resolve(Napi::Number::New(Env(), removed_));
+    }
+
+    void OnError(const Napi::Error& e) override {
+        deferred_.Reject(e.Value());
+    }
+
+private:
+    FaissIndexWrapper* wrapper_;
+    std::vector<int32_t> ids_;
+    size_t removed_;
+    Napi::Promise::Deferred deferred_;
+};
+
 // Save Worker
 class SaveWorker : public Napi::AsyncWorker {
 public:
@@ -426,17 +602,23 @@ private:
     Napi::Value Search(const Napi::CallbackInfo& info);
     Napi::Value SearchBatch(const Napi::CallbackInfo& info);
     Napi::Value RangeSearch(const Napi::CallbackInfo& info);
+    Napi::Value Reconstruct(const Napi::CallbackInfo& info);
+    Napi::Value ReconstructBatch(const Napi::CallbackInfo& info);
+    Napi::Value RemoveIds(const Napi::CallbackInfo& info);
     Napi::Value GetStats(const Napi::CallbackInfo& info);
     Napi::Value Dispose(const Napi::CallbackInfo& info);
     Napi::Value Save(const Napi::CallbackInfo& info);
     Napi::Value ToBuffer(const Napi::CallbackInfo& info);
     Napi::Value MergeFrom(const Napi::CallbackInfo& info);
     Napi::Value SetNprobe(const Napi::CallbackInfo& info);
+    Napi::Value ToGpu(const Napi::CallbackInfo& info);
+    Napi::Value ToCpu(const Napi::CallbackInfo& info);
     Napi::Value Reset(const Napi::CallbackInfo& info);
     
     // Static methods
     static Napi::Value Load(const Napi::CallbackInfo& info);
     static Napi::Value FromBuffer(const Napi::CallbackInfo& info);
+    static Napi::Value GpuSupport(const Napi::CallbackInfo& info);
     
     // Helper methods
     void ValidateNotDisposed(Napi::Env env) const;
@@ -454,15 +636,21 @@ Napi::Object FaissIndexWrapperJS::Init(Napi::Env env, Napi::Object exports) {
         InstanceMethod("search", &FaissIndexWrapperJS::Search),
         InstanceMethod("searchBatch", &FaissIndexWrapperJS::SearchBatch),
         InstanceMethod("rangeSearch", &FaissIndexWrapperJS::RangeSearch),
+        InstanceMethod("reconstruct", &FaissIndexWrapperJS::Reconstruct),
+        InstanceMethod("reconstructBatch", &FaissIndexWrapperJS::ReconstructBatch),
+        InstanceMethod("removeIds", &FaissIndexWrapperJS::RemoveIds),
         InstanceMethod("getStats", &FaissIndexWrapperJS::GetStats),
         InstanceMethod("dispose", &FaissIndexWrapperJS::Dispose),
         InstanceMethod("save", &FaissIndexWrapperJS::Save),
         InstanceMethod("toBuffer", &FaissIndexWrapperJS::ToBuffer),
         InstanceMethod("mergeFrom", &FaissIndexWrapperJS::MergeFrom),
         InstanceMethod("setNprobe", &FaissIndexWrapperJS::SetNprobe),
+        InstanceMethod("toGpu", &FaissIndexWrapperJS::ToGpu),
+        InstanceMethod("toCpu", &FaissIndexWrapperJS::ToCpu),
         InstanceMethod("reset", &FaissIndexWrapperJS::Reset),
         StaticMethod("load", &FaissIndexWrapperJS::Load),
         StaticMethod("fromBuffer", &FaissIndexWrapperJS::FromBuffer),
+        StaticMethod("gpuSupport", &FaissIndexWrapperJS::GpuSupport),
     });
     
     constructor = Napi::Persistent(func);
@@ -500,14 +688,82 @@ FaissIndexWrapperJS::FaissIndexWrapperJS(const Napi::CallbackInfo& info)
         
         // Get index type (default to "FLAT_L2" -> "Flat")
         std::string indexDescription = "Flat";  // Default: IndexFlatL2
+        std::string typeLabel = "FLAT_L2";
         int metric = 1;  // Default: METRIC_L2
         bool isHnsw = false;
         int efConstruction = 200;
         int efSearch = 50;
-        
-        if (config.Has("type") && config.Get("type").IsString()) {
+        std::string factoryDescription;
+
+        auto readPositiveInt = [&](const char* key, int defaultValue) -> int {
+            if (!config.Has(key)) {
+                return defaultValue;
+            }
+
+            if (!config.Get(key).IsNumber()) {
+                throw Napi::TypeError::New(env, std::string("Expected number for ") + key);
+            }
+
+            int value = config.Get(key).As<Napi::Number>().Int32Value();
+            if (value <= 0) {
+                throw Napi::RangeError::New(env, std::string(key) + " must be positive");
+            }
+
+            return value;
+        };
+
+        auto pqDescription = [&](int defaultSegments = 8, int defaultBits = 8) -> std::string {
+            int pqSegments = readPositiveInt("pqSegments", defaultSegments);
+            int pqBits = readPositiveInt("pqBits", defaultBits);
+
+            if (dims_ % pqSegments != 0) {
+                throw Napi::RangeError::New(
+                    env,
+                    "pqSegments must evenly divide dims. Got dims=" +
+                    std::to_string(dims_) + ", pqSegments=" + std::to_string(pqSegments));
+            }
+
+            if (pqBits == 8) {
+                return "PQ" + std::to_string(pqSegments);
+            }
+
+            return "PQ" + std::to_string(pqSegments) + "x" + std::to_string(pqBits);
+        };
+
+        auto metricFromConfig = [&]() -> int {
+            if (!config.Has("metric")) {
+                return metric;
+            }
+
+            if (!config.Get("metric").IsString()) {
+                throw Napi::TypeError::New(env, "Expected string for metric");
+            }
+
+            std::string metricName = config.Get("metric").As<Napi::String>().Utf8Value();
+            if (metricName == "l2") {
+                return 1;
+            }
+
+            if (metricName == "ip") {
+                return 0;
+            }
+
+            throw Napi::TypeError::New(env, "Unsupported metric: " + metricName + ". Supported: l2, ip");
+        };
+
+        if (config.Has("factory")) {
+            if (!config.Get("factory").IsString()) {
+                throw Napi::TypeError::New(env, "Expected string for factory");
+            }
+
+            indexDescription = config.Get("factory").As<Napi::String>().Utf8Value();
+            factoryDescription = indexDescription;
+            typeLabel.clear();
+            metric = metricFromConfig();
+        } else if (config.Has("type") && config.Get("type").IsString()) {
             std::string type = config.Get("type").As<Napi::String>().Utf8Value();
-            
+            typeLabel = type;
+
             if (type == "FLAT_L2") {
                 indexDescription = "Flat";
                 metric = 1;  // METRIC_L2
@@ -515,55 +771,58 @@ FaissIndexWrapperJS::FaissIndexWrapperJS(const Napi::CallbackInfo& info)
                 indexDescription = "Flat";
                 metric = 0;  // METRIC_INNER_PRODUCT
             } else if (type == "IVF_FLAT") {
-                // Build IVF string: "IVF{nlist},Flat"
-                int nlist = 100;  // Default number of clusters
-                if (config.Has("nlist") && config.Get("nlist").IsNumber()) {
-                    nlist = config.Get("nlist").As<Napi::Number>().Int32Value();
-                    if (nlist <= 0) {
-                        throw Napi::RangeError::New(env, "nlist must be positive");
-                    }
-                }
+                int nlist = readPositiveInt("nlist", 100);
                 indexDescription = "IVF" + std::to_string(nlist) + ",Flat";
-                metric = 1;  // METRIC_L2
-            } else if (type == "HNSW") {
-                // Build HNSW string: "HNSW{M}"
-                isHnsw = true;
-                int M = 16;  // Default connections per node
-                if (config.Has("M") && config.Get("M").IsNumber()) {
-                    M = config.Get("M").As<Napi::Number>().Int32Value();
-                    if (M <= 0) {
-                        throw Napi::RangeError::New(env, "M must be positive");
+                metric = metricFromConfig();
+            } else if (type == "PQ") {
+                indexDescription = pqDescription();
+                metric = metricFromConfig();
+            } else if (type == "IVF_PQ") {
+                int nlist = readPositiveInt("nlist", 100);
+                indexDescription = "IVF" + std::to_string(nlist) + "," + pqDescription();
+                metric = metricFromConfig();
+            } else if (type == "IVF_SQ") {
+                int nlist = readPositiveInt("nlist", 100);
+                std::string sqType = "SQ8";
+                if (config.Has("sqType")) {
+                    if (!config.Get("sqType").IsString()) {
+                        throw Napi::TypeError::New(env, "Expected string for sqType");
+                    }
+                    sqType = config.Get("sqType").As<Napi::String>().Utf8Value();
+                    if (sqType.empty()) {
+                        throw Napi::TypeError::New(env, "sqType must be a non-empty string");
                     }
                 }
+                indexDescription = "IVF" + std::to_string(nlist) + "," + sqType;
+                metric = metricFromConfig();
+            } else if (type == "HNSW") {
+                isHnsw = true;
+                int M = readPositiveInt("M", 16);
                 indexDescription = "HNSW" + std::to_string(M);
-                metric = 1;  // METRIC_L2
+                metric = metricFromConfig();
 
                 if (config.Has("efConstruction")) {
-                    if (!config.Get("efConstruction").IsNumber()) {
-                        throw Napi::TypeError::New(env, "Expected number for efConstruction");
-                    }
-                    efConstruction = config.Get("efConstruction").As<Napi::Number>().Int32Value();
-                    if (efConstruction <= 0) {
-                        throw Napi::RangeError::New(env, "efConstruction must be positive");
-                    }
+                    efConstruction = readPositiveInt("efConstruction", efConstruction);
                 }
 
                 if (config.Has("efSearch")) {
-                    if (!config.Get("efSearch").IsNumber()) {
-                        throw Napi::TypeError::New(env, "Expected number for efSearch");
-                    }
-                    efSearch = config.Get("efSearch").As<Napi::Number>().Int32Value();
-                    if (efSearch <= 0) {
-                        throw Napi::RangeError::New(env, "efSearch must be positive");
-                    }
+                    efSearch = readPositiveInt("efSearch", efSearch);
                 }
             } else {
-                throw Napi::TypeError::New(env, "Unsupported index type: " + type + ". Supported: FLAT_L2, FLAT_IP, IVF_FLAT, HNSW");
+                throw Napi::TypeError::New(
+                    env,
+                    "Unsupported index type: " + type +
+                    ". Supported: FLAT_L2, FLAT_IP, IVF_FLAT, HNSW, PQ, IVF_PQ, IVF_SQ");
             }
         }
-        
+
         // Create the C++ wrapper with index_factory
-        wrapper_ = std::make_unique<FaissIndexWrapper>(dims_, indexDescription, metric);
+        wrapper_ = std::make_unique<FaissIndexWrapper>(
+            dims_,
+            indexDescription,
+            metric,
+            typeLabel,
+            factoryDescription);
 
         if (isHnsw) {
             wrapper_->SetHnswParams(efConstruction, efSearch);
@@ -732,6 +991,56 @@ Napi::Value FaissIndexWrapperJS::SetNprobe(const Napi::CallbackInfo& info) {
         throw Napi::Error::New(env, std::string("FAISS error: ") + e.what());
     } catch (...) {
         throw Napi::Error::New(env, "Unknown error in setNprobe()");
+    }
+}
+
+Napi::Value FaissIndexWrapperJS::ToGpu(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    try {
+        ValidateNotDisposed(env);
+
+        int device = 0;
+        if (info.Length() >= 1) {
+            if (!info[0].IsNumber()) {
+                throw Napi::TypeError::New(env, "Expected number for device");
+            }
+
+            device = info[0].As<Napi::Number>().Int32Value();
+            if (device < 0) {
+                throw Napi::RangeError::New(env, "device must be non-negative");
+            }
+        }
+
+        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
+        GpuTransferWorker* worker = new GpuTransferWorker(Value(), wrapper_.get(), true, device, deferred);
+        worker->Queue();
+        return deferred.Promise();
+    } catch (const Napi::Error& e) {
+        throw;
+    } catch (const std::exception& e) {
+        throw Napi::Error::New(env, std::string("FAISS error: ") + e.what());
+    } catch (...) {
+        throw Napi::Error::New(env, "Unknown error in toGpu()");
+    }
+}
+
+Napi::Value FaissIndexWrapperJS::ToCpu(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    try {
+        ValidateNotDisposed(env);
+
+        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
+        GpuTransferWorker* worker = new GpuTransferWorker(Value(), wrapper_.get(), false, 0, deferred);
+        worker->Queue();
+        return deferred.Promise();
+    } catch (const Napi::Error& e) {
+        throw;
+    } catch (const std::exception& e) {
+        throw Napi::Error::New(env, std::string("FAISS error: ") + e.what());
+    } catch (...) {
+        throw Napi::Error::New(env, "Unknown error in toCpu()");
     }
 }
 
@@ -907,6 +1216,130 @@ Napi::Value FaissIndexWrapperJS::RangeSearch(const Napi::CallbackInfo& info) {
     }
 }
 
+Napi::Value FaissIndexWrapperJS::Reconstruct(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    try {
+        ValidateNotDisposed(env);
+
+        if (info.Length() < 1) {
+            throw Napi::TypeError::New(env, "Expected 1 argument: id (number)");
+        }
+
+        if (!info[0].IsNumber()) {
+            throw Napi::TypeError::New(env, "Expected number for id");
+        }
+
+        int64_t id = static_cast<int64_t>(info[0].As<Napi::Number>().Int64Value());
+        if (id < 0) {
+            throw Napi::RangeError::New(env, "id must be non-negative");
+        }
+
+        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
+        ReconstructWorker* worker = new ReconstructWorker(wrapper_.get(), id, deferred);
+        worker->Queue();
+
+        return deferred.Promise();
+
+    } catch (const Napi::Error& e) {
+        throw;
+    } catch (const std::exception& e) {
+        throw Napi::Error::New(env, std::string("FAISS error: ") + e.what());
+    } catch (...) {
+        throw Napi::Error::New(env, "Unknown error in reconstruct()");
+    }
+}
+
+Napi::Value FaissIndexWrapperJS::ReconstructBatch(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    try {
+        ValidateNotDisposed(env);
+
+        if (info.Length() < 1) {
+            throw Napi::TypeError::New(env, "Expected 1 argument: ids (Int32Array)");
+        }
+
+        if (!info[0].IsTypedArray()) {
+            throw Napi::TypeError::New(env, "Expected Int32Array for ids");
+        }
+
+        Napi::TypedArray arr = info[0].As<Napi::TypedArray>();
+        if (arr.TypedArrayType() != napi_int32_array) {
+            throw Napi::TypeError::New(env, "Expected Int32Array for ids");
+        }
+
+        Napi::Int32Array idsArr = arr.As<Napi::Int32Array>();
+        if (idsArr.ElementLength() == 0) {
+            throw Napi::RangeError::New(env, "ids array cannot be empty");
+        }
+
+        for (size_t i = 0; i < idsArr.ElementLength(); i++) {
+            if (idsArr[i] < 0) {
+                throw Napi::RangeError::New(env, "ids must be non-negative");
+            }
+        }
+
+        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
+        ReconstructBatchWorker* worker = new ReconstructBatchWorker(wrapper_.get(), idsArr.Data(), idsArr.ElementLength(), deferred);
+        worker->Queue();
+
+        return deferred.Promise();
+
+    } catch (const Napi::Error& e) {
+        throw;
+    } catch (const std::exception& e) {
+        throw Napi::Error::New(env, std::string("FAISS error: ") + e.what());
+    } catch (...) {
+        throw Napi::Error::New(env, "Unknown error in reconstructBatch()");
+    }
+}
+
+Napi::Value FaissIndexWrapperJS::RemoveIds(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    try {
+        ValidateNotDisposed(env);
+
+        if (info.Length() < 1) {
+            throw Napi::TypeError::New(env, "Expected 1 argument: ids (Int32Array)");
+        }
+
+        if (!info[0].IsTypedArray()) {
+            throw Napi::TypeError::New(env, "Expected Int32Array for ids");
+        }
+
+        Napi::TypedArray arr = info[0].As<Napi::TypedArray>();
+        if (arr.TypedArrayType() != napi_int32_array) {
+            throw Napi::TypeError::New(env, "Expected Int32Array for ids");
+        }
+
+        Napi::Int32Array idsArr = arr.As<Napi::Int32Array>();
+        if (idsArr.ElementLength() == 0) {
+            throw Napi::RangeError::New(env, "ids array cannot be empty");
+        }
+
+        for (size_t i = 0; i < idsArr.ElementLength(); i++) {
+            if (idsArr[i] < 0) {
+                throw Napi::RangeError::New(env, "ids must be non-negative");
+            }
+        }
+
+        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
+        RemoveIdsWorker* worker = new RemoveIdsWorker(wrapper_.get(), idsArr.Data(), idsArr.ElementLength(), deferred);
+        worker->Queue();
+
+        return deferred.Promise();
+
+    } catch (const Napi::Error& e) {
+        throw;
+    } catch (const std::exception& e) {
+        throw Napi::Error::New(env, std::string("FAISS error: ") + e.what());
+    } catch (...) {
+        throw Napi::Error::New(env, "Unknown error in removeIds()");
+    }
+}
+
 Napi::Value FaissIndexWrapperJS::GetStats(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     
@@ -918,6 +1351,8 @@ Napi::Value FaissIndexWrapperJS::GetStats(const Napi::CallbackInfo& info) {
         stats.Set("dims", Napi::Number::New(env, wrapper_->GetDimensions()));
         stats.Set("isTrained", Napi::Boolean::New(env, wrapper_->IsTrained()));
         stats.Set("type", Napi::String::New(env, wrapper_->GetIndexType()));
+        stats.Set("factory", Napi::String::New(env, wrapper_->GetFactoryDescription()));
+        stats.Set("metric", Napi::String::New(env, wrapper_->GetMetricName()));
         
         return stats;
         
@@ -1150,9 +1585,26 @@ Napi::Value FaissIndexWrapperJS::FromBuffer(const Napi::CallbackInfo& info) {
     }
 }
 
+Napi::Value FaissIndexWrapperJS::GpuSupport(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    Napi::Object result = Napi::Object::New(env);
+    const bool compiled = FaissIndexWrapper::HasGpuSupport();
+    result.Set("compiled", Napi::Boolean::New(env, compiled));
+    result.Set("available", Napi::Boolean::New(env, compiled));
+    result.Set(
+        "reason",
+        Napi::String::New(
+            env,
+            compiled
+                ? "CUDA-enabled FAISS GPU support is compiled into this addon."
+                : "This binary was built without CUDA-enabled FAISS GPU support."));
+    return result;
+}
+
 // Module initialization
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     FaissIndexWrapperJS::Init(env, exports);
+    InitFaissBinaryIndexWrapper(env, exports);
     return exports;
 }
 

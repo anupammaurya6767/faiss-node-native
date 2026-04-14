@@ -21,7 +21,7 @@ cat package.json | grep -A 5 '"name"'
 cat package.json | grep '"version"'
 ```
 
-**Current version:** `0.1.0` (first release)
+**Current version:** Check `package.json` before publishing.
 
 ### Step 2: Login to npm
 
@@ -47,7 +47,7 @@ cd /tmp
 mkdir test-package-install
 cd test-package-install
 npm init -y
-npm install /path/to/faiss-node/faiss-node-native-0.1.0.tgz
+npm install /path/to/faiss-node-native/faiss-node-native-<version>.tgz
 node -e "const { FaissIndex } = require('@faiss-node/native'); console.log('✅ Package works!');"
 ```
 
@@ -70,7 +70,7 @@ npm publish --dry-run
 
 ```bash
 # Make sure you're in the project root
-cd /Users/anupam/Desktop/open-source/test/faiss-node
+cd /path/to/faiss-node-native
 
 # Publish (uses token from .env automatically)
 npm run publish:local
@@ -103,7 +103,7 @@ node -e "const { FaissIndex } = require('@faiss-node/native'); const idx = new F
 
 ### Semantic Versioning (SemVer)
 
-- **MAJOR.MINOR.PATCH** (e.g., `0.1.0`)
+- **MAJOR.MINOR.PATCH** (for example `0.1.11`)
 - **MAJOR**: Breaking changes
 - **MINOR**: New features (backward compatible)
 - **PATCH**: Bug fixes (backward compatible)
@@ -111,13 +111,13 @@ node -e "const { FaissIndex } = require('@faiss-node/native'); const idx = new F
 ### Updating Version
 
 ```bash
-# Patch version (0.1.0 -> 0.1.1)
+# Patch version (0.1.11 -> 0.1.12)
 npm version patch
 
-# Minor version (0.1.0 -> 0.2.0)
+# Minor version (0.1.11 -> 0.2.0)
 npm version minor
 
-# Major version (0.1.0 -> 1.0.0)
+# Major version (0.1.11 -> 1.0.0)
 npm version major
 
 # This automatically:
@@ -183,8 +183,8 @@ Excluded:
 
 1. **Create a GitHub Release**
    ```bash
-   git tag -a v0.1.0 -m "First release: @faiss-node/native v0.1.0"
-   git push origin v0.1.0
+   git tag -a v<version> -m "Release @faiss-node/native v<version>"
+   git push origin v<version>
    ```
    Then create a release on GitHub with release notes
 

@@ -12,7 +12,12 @@ High-performance Node.js native bindings for [Facebook FAISS](https://github.com
 
 - 🚀 **Async Operations** - Non-blocking Promise-based API that never blocks the event loop
 - 🔒 **Thread-Safe** - Mutex-protected concurrent operations for production workloads
-- 📦 **Multiple Index Types** - FLAT_L2, FLAT_IP (cosine similarity), IVF_FLAT, and HNSW with optimized defaults
+- 📦 **Multiple Index Types** - FLAT_L2, FLAT_IP, IVF_FLAT, HNSW, PQ, IVF_PQ, IVF_SQ, BINARY_FLAT, BINARY_HNSW, BINARY_IVF, BINARY_HASH, plus raw FAISS factory strings for advanced pipelines
+- 🛠️ **Utility Helpers** - Vector normalization, validation, chunking, and distance calculations
+- 🔎 **Index Operations** - Reconstruction, removal, validation, inspection, metrics, and progress helpers
+- 💻 **CLI Included** - Create, train, add, search, inspect, and validate indexes from the terminal
+- 🧮 **Binary Search Support** - Byte-packed binary vectors with Hamming-distance search and persistence
+- 🖥️ **GPU Migration Hooks** - `toGpu()` / `toCpu()` for float and binary indexes when compiled against a GPU-enabled FAISS build
 - 💾 **Persistence** - Save/load indexes to disk or serialize to buffers
 - ⚡ **High Performance** - Direct C++ bindings with zero-copy data transfer
 - 📚 **TypeScript Support** - Full type definitions included
@@ -73,6 +78,24 @@ After installing prerequisites:
 npm run build
 ```
 
+### CLI
+
+The package ships with a `faiss-node` CLI for common indexing workflows:
+
+```bash
+faiss-node create --output index.faiss --type HNSW --dims 768
+faiss-node train --index index.faiss --file train.bin
+faiss-node add --index index.faiss --file vectors.bin --batch 10000
+faiss-node search --index index.faiss --query query.bin --k 10
+faiss-node info --index index.faiss
+faiss-node validate --index index.faiss
+faiss-node create --output binary.faiss --binary --type BINARY_HNSW --dims 256
+faiss-node add --index binary.faiss --binary --file hashes.bin
+faiss-node search --index binary.faiss --binary --query hash.bin --k 10
+```
+
+CLI float inputs are raw little-endian `Float32` buffers. Binary CLI inputs are raw `Uint8` buffers where each vector consumes `dims / 8` bytes. The CLI writes a `.meta.json` sidecar next to the FAISS index so dimensions, kind, and configuration can be inferred on later commands.
+
 ## Quick Start
 
 ```javascript
@@ -100,26 +123,140 @@ console.log('Distances:', results.distances); // Float32Array: [0, 2]
 index.dispose();
 ```
 
+## Binary Quick Start
+
+```javascript
+const { FaissBinaryIndex } = require('@faiss-node/native');
+
+const index = new FaissBinaryIndex({
+  type: 'BINARY_HNSW',
+  dims: 64, // bits
+  M: 16,
+});
+
+await index.add(new Uint8Array([
+  0x00, 0x00, 0xaa, 0xaa, 0xff, 0xff, 0x55, 0x55,
+  0xf0, 0x0f, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc,
+]));
+
+const results = await index.search(new Uint8Array([
+  0xf0, 0x0f, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc,
+]), 1);
+
+console.log(results.labels);      // Int32Array
+console.log(results.distances);   // Int32Array (Hamming distance)
+```
+
+## Utility Helpers
+
+The package also exports helper functions for common preprocessing and diagnostics:
+
+```javascript
+const {
+  normalizeVectors,
+  validateVectors,
+  validateBinaryVectors,
+  splitVectors,
+  computeDistances,
+} = require('@faiss-node/native');
+
+const normalized = normalizeVectors(vectors, 768);
+const report = validateVectors(normalized, 768);
+const binaryReport = validateBinaryVectors(binaryHashes, 256);
+const chunks = splitVectors(normalized, 768, 10000);
+const distances = computeDistances(query, candidate, { dims: 768, metric: 'cosine' });
+```
+
+## Enhanced Operations
+
+The `FaissIndex` and `FaissBinaryIndex` wrappers include higher-level operations that are useful in production workflows:
+
+```javascript
+const vector = await index.reconstruct(42);
+const vectors = await index.reconstructBatch([0, 10, 25]);
+const removed = await index.removeIds([3, 4, 5]);
+const count = index.getVectorCount();
+const inspection = index.inspect();
+const validation = await index.validate();
+const metrics = index.getMetrics();
+```
+
+For large ingest jobs you can also opt into progress callbacks:
+
+```javascript
+await index.addWithProgress(vectors, {
+  batchSize: 10000,
+  onProgress(update) {
+    console.log(update);
+  },
+});
+```
+
+## GPU Support
+
+The JS API exposes `FaissIndex.gpuSupport()` and `index.toGpu()` / `index.toCpu()` hooks for float indexes. In the default local setup used by this repository, the addon is built against CPU FAISS, so GPU migration remains unavailable and `gpuSupport().available` will be `false`.
+
+If your FAISS installation exposes the GPU headers and libraries at build time, the addon will compile the native GPU migration path and those hooks become active.
+
+On Linux, the addon now checks the common CUDA toolkit include and library locations under `/usr/local/cuda` automatically so GPU-enabled FAISS builds can link `cudart` and `cublas` without extra manual `binding.gyp` edits.
+
+For binary indexes, GPU support is intentionally limited to `BINARY_FLAT`. Upstream FAISS's binary GPU cloner in this release line maps `IndexBinaryFlat` to `GpuIndexBinaryFlat` and throws for unsupported binary index types, so `BINARY_HNSW`, `BINARY_IVF`, and `BINARY_HASH` remain CPU-only in this wrapper. When `toGpu()` is called on one of those unsupported binary index types, the JS wrapper emits a warning and keeps the index on CPU instead of failing the operation. If you want to route those warnings somewhere other than `process.emitWarning()`, pass `warningHandler` in the `FaissBinaryIndex` runtime config.
+
+## Example Recipes
+
+Additional example entry points in [`examples/`](examples/):
+
+- `semantic-search-openai.js` for OpenAI embedding-based semantic search
+- `express-search-api.js` for an Express.js vector search API
+- `fastify-search-api.js` for a Fastify-based vector search API
+- `graphql-search.js` for GraphQL resolver integration
+- `user-recommendations.js` for recommendation-style cosine similarity
+- `binary-search.js` for Hamming-distance search over byte-packed vectors
+- `image-similarity.js` and `audio-similarity.js` for modality-specific similarity workflows
+- `vercel-serverless-search.js` for a serverless-style request handler example
+- `postgres-pgvector-sync.js` for syncing PostgreSQL/pgvector data into FAISS
+- `cli-workflow.sh` for an end-to-end CLI workflow
+- `rag-pipeline.js` and `benchmark.js` for larger end-to-end demos
+
+Additional written guides:
+
+- [docs/integration-recipes.md](docs/integration-recipes.md)
+- [docs/vector-search-concepts.md](docs/vector-search-concepts.md)
+
 ## API Reference
 
 ### Constructor
 
-Create a new FAISS index with the specified configuration.
+Create a new float or binary FAISS index with the specified configuration.
 
 ```javascript
 const index = new FaissIndex(config);
 ```
 
 **Parameters:**
-- `config.type` (string, optional): Index type - `'FLAT_L2'`, `'FLAT_IP'`, `'IVF_FLAT'`, or `'HNSW'` (default: `'FLAT_L2'`)
+- `config.type` (string, optional): Index type - `'FLAT_L2'`, `'FLAT_IP'`, `'IVF_FLAT'`, `'HNSW'`, `'PQ'`, `'IVF_PQ'`, or `'IVF_SQ'` (default: `'FLAT_L2'`)
+- `config.factory` (string, optional): Raw FAISS factory string for advanced pipelines such as OPQ, PCA, or PCAR
 - `config.dims` (number, required): Vector dimensions (must be positive integer)
-- `config.nlist` (number, optional): Number of clusters for IVF_FLAT (default: 100)
-- `config.nprobe` (number, optional): Clusters to search for IVF_FLAT (default: 10)
+- `config.metric` (string, optional): Distance metric - `'l2'` or `'ip'` for compatible index types and raw factory indexes
+- `config.nlist` (number, optional): Number of clusters for IVF_FLAT, IVF_PQ, or IVF_SQ (default: 100)
+- `config.nprobe` (number, optional): Clusters to search for IVF_FLAT, IVF_PQ, or IVF_SQ (default: 10)
 - `config.M` (number, optional): Connections per node for HNSW (default: 16)
 - `config.efConstruction` (number, optional): HNSW construction parameter (default: 200)
 - `config.efSearch` (number, optional): HNSW search parameter (default: 50)
+- `config.pqSegments` (number, optional): Number of PQ subquantizers for PQ and IVF_PQ
+- `config.pqBits` (number, optional): Bits per PQ code for PQ and IVF_PQ (default: 8)
+- `config.sqType` (string, optional): Scalar quantizer type for IVF_SQ (default: `'SQ8'`)
 
-Use `nlist` and `nprobe` only with `IVF_FLAT`, and use `M`, `efConstruction`, and `efSearch` only with `HNSW`.
+Use `nlist` and `nprobe` only with `IVF_FLAT`, `IVF_PQ`, or `IVF_SQ`. Use `pqSegments` and `pqBits` only with `PQ` or `IVF_PQ`. Use `M`, `efConstruction`, and `efSearch` only with `HNSW`. Use `factory` by itself for advanced FAISS pipelines, because the topology is encoded directly in the factory string.
+
+For binary indexes, use `new FaissBinaryIndex(config)` with:
+
+- `config.type`: `'BINARY_FLAT'`, `'BINARY_HNSW'`, `'BINARY_IVF'`, or `'BINARY_HASH'`
+- `config.dims`: number of bits per vector (must be divisible by 8)
+- `config.nlist` / `config.nprobe`: IVF-specific options
+- `config.M`, `config.efConstruction`, `config.efSearch`: HNSW-specific options
+- `config.hashBits`, `config.hashNflip`: binary hash index options
+- `config.factory`: raw binary FAISS factory string such as `BFlat`, `BHNSW32`, or `BIVF1024`
 
 **Examples:**
 
@@ -141,6 +278,36 @@ const ivfIndex = new FaissIndex({
 });
 await ivfIndex.train(trainingVectors);  // Must train before adding vectors!
 
+// PQ - Memory efficient quantization without IVF
+const pqIndex = new FaissIndex({
+  type: 'PQ',
+  dims: 768,
+  pqSegments: 48,
+  pqBits: 8
+});
+await pqIndex.train(trainingVectors);
+
+// IVF_PQ - IVF coarse quantization plus PQ compression
+const ivfPqIndex = new FaissIndex({
+  type: 'IVF_PQ',
+  dims: 768,
+  nlist: 100,
+  nprobe: 10,
+  pqSegments: 48,
+  pqBits: 8
+});
+await ivfPqIndex.train(trainingVectors);
+
+// IVF_SQ - IVF with scalar quantization
+const ivfSqIndex = new FaissIndex({
+  type: 'IVF_SQ',
+  dims: 768,
+  nlist: 100,
+  nprobe: 10,
+  sqType: 'SQ8'
+});
+await ivfSqIndex.train(trainingVectors);
+
 // HNSW - State-of-the-art approximate search (best for large datasets)
 const hnswIndex = new FaissIndex({ 
   type: 'HNSW', 
@@ -149,6 +316,18 @@ const hnswIndex = new FaissIndex({
   efConstruction: 200, // Construction parameter
   efSearch: 50        // Search parameter (higher = more accurate, slower)
 });
+
+// Advanced factory string - unlock FAISS preprocessing pipelines
+const customIndex = new FaissIndex({
+  dims: 768,
+  factory: 'PCA256,Flat',
+  metric: 'l2'
+});
+await customIndex.train(trainingVectors);
+
+// You can also pass OPQ / PCAR pipelines directly:
+// 'OPQ48_192,IVF100,PQ48'
+// 'PCAR256,IVF100,PQ48'
 ```
 
 ### Methods
@@ -774,19 +953,30 @@ The implementation uses mutex locks to ensure FAISS operations are serialized sa
 
 ## Error Handling
 
-All methods throw JavaScript errors (not C++ exceptions):
+All methods throw JavaScript errors (not raw C++ exceptions). The JS layer validates types, dimensions, and non-finite values before calling into the native addon:
 
 ```javascript
+const {
+  FaissIndex,
+  ValidationError,
+  InvalidVectorError,
+  IndexDisposedError,
+} = require('@faiss-node/native');
+
 try {
   await index.add(vectors);
 } catch (error) {
-  if (error.message.includes('disposed')) {
+  if (error instanceof InvalidVectorError) {
+    console.error('Vector/query payload is invalid');
+  } else if (error instanceof ValidationError) {
+    console.error('Configuration or parameter validation failed');
+  } else if (error instanceof IndexDisposedError) {
     console.error('Index was disposed');
-  } else if (error.message.includes('dimensions')) {
-    console.error('Vector dimensions mismatch');
   }
 }
 ```
+
+Float vector inputs containing `NaN` or `Infinity` are rejected deliberately. That includes `add()`, `search()`, and `searchBatch()`.
 
 ## TypeScript Support
 
@@ -815,7 +1005,7 @@ npm update @faiss-node/native
 Or install a specific version:
 
 ```bash
-npm install @faiss-node/native@0.1.2
+npm install @faiss-node/native@latest
 ```
 
 ## Development
@@ -860,13 +1050,16 @@ npm run test:ci       # CI tests (faster, no manual tests)
 ### Generating Documentation
 
 ```bash
-npm run docs          # Generate Doxygen documentation
-npm run docs:serve    # Serve docs locally at http://localhost:8000
+npm run docs              # Generate TypeDoc and Doxygen output
+npm run docs:serve        # Serve JS/TS docs locally at http://localhost:8000
+npm run docs:serve:cpp    # Serve C++ docs locally at http://localhost:8001
 ```
 
 ## Documentation
 
-- **API Documentation**: [GitHub Pages](https://anupammaurya6767.github.io/faiss-node-native/)
+- **GitHub Pages**: [Documentation Home](https://anupammaurya6767.github.io/faiss-node-native/)
+- **JS/TS API Reference**: [TypeDoc](https://anupammaurya6767.github.io/faiss-node-native/api/)
+- **C++ Native Reference**: [Doxygen](https://anupammaurya6767.github.io/faiss-node-native/native/)
 - **Examples**: See `examples/` directory
 - **Contributing**: See [CONTRIBUTING.md](./CONTRIBUTING.md)
 
