@@ -407,7 +407,7 @@ jobs:
           ls -la dist/windows-x64/ 2>/dev/null || echo "  Not found (skipped - expected if FAISS not installed)"
       
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           draft: false
           files: |
