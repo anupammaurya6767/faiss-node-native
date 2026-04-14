@@ -63,7 +63,7 @@ jobs:
           tar -czf dist/faiss-node-macos-arm64.tar.gz build/Release/faiss_node.node
       
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-arm64
           path: dist/faiss-node-macos-arm64.tar.gz
@@ -169,7 +169,7 @@ jobs:
           tar -czf dist/faiss-node-linux-x64.tar.gz build/Release/faiss_node.node
       
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-x64
           path: dist/faiss-node-linux-x64.tar.gz
@@ -284,7 +284,7 @@ jobs:
       
       - name: Upload artifact (Windows - if built)
         if: steps.check_faiss_early.outputs.FAISS_FOUND == 'true' && success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-x64
           path: |
@@ -303,7 +303,7 @@ jobs:
       
       - name: Upload skipped marker (Windows)
         if: steps.check_faiss_early.outputs.FAISS_FOUND != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-x64
           path: dist/windows-x64-skipped.txt
