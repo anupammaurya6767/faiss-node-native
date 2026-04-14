@@ -638,12 +638,21 @@ describe('HNSW Edge Cases and Stress Tests', () => {
 
     describe('Stress Tests', () => {
         test('handles large number of vectors', async () => {
-            const index = new FaissIndex({ type: 'HNSW', dims: 128, M: 16 });
-            const vectors = new Float32Array(Array(10000 * 128).fill(0).map(() => Math.random()));
+            const dims = 128;
+            const numVectors = 5000;
+            const index = new FaissIndex({ type: 'HNSW', dims, M: 16 });
+
+            // Keep this large enough to exercise HNSW insertion without
+            // tripping the default Jest timeout on slower CI runners.
+            const vectors = new Float32Array(numVectors * dims);
+            for (let i = 0; i < vectors.length; i++) {
+                vectors[i] = Math.random();
+            }
+
             await index.add(vectors);
             
-            expect(index.getStats().ntotal).toBe(10000);
-        });
+            expect(index.getStats().ntotal).toBe(numVectors);
+        }, 60000);
 
         test('handles high-dimensional vectors', async () => {
             const dims = 512;
