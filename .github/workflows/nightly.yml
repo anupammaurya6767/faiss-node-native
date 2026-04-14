@@ -10,7 +10,7 @@ jobs:
     name: Nightly build, test, and example smoke
     runs-on: ubuntu-latest
     env:
-      FAISS_REF: 3f127ee3bad4922b1ba0cf2f17f1368d99a241ec
+      FAISS_REF: v1.14.1
       OMP_NUM_THREADS: 1
       OMP_THREAD_LIMIT: 1
 
@@ -31,9 +31,8 @@ jobs:
 
       - name: Build and install FAISS (CPU)
         run: |
-          git clone --depth 1 https://github.com/facebookresearch/faiss.git /tmp/faiss
+          git clone --branch "$FAISS_REF" --depth 1 https://github.com/facebookresearch/faiss.git /tmp/faiss
           cd /tmp/faiss
-          git checkout "$FAISS_REF"
           cmake -B build \
             -DFAISS_ENABLE_GPU=OFF \
             -DFAISS_ENABLE_PYTHON=OFF \
