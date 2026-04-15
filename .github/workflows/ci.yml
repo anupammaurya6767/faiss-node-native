@@ -33,6 +33,19 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
+
+      - name: Detect Blackfire credentials
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
+        id: blackfire
+        run: |
+          if [ -n "${{ secrets.BLACKFIRE_SERVER_ID }}" ] && \
+             [ -n "${{ secrets.BLACKFIRE_SERVER_TOKEN }}" ] && \
+             [ -n "${{ secrets.BLACKFIRE_CLIENT_ID }}" ] && \
+             [ -n "${{ secrets.BLACKFIRE_CLIENT_TOKEN }}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
       
       - name: Install dependencies (Linux)
         if: matrix.os == 'ubuntu-latest'
@@ -472,6 +485,33 @@ jobs:
       - name: Run integration tests (macOS/Linux)
         if: matrix.os != 'windows-latest'
         run: npm run test:integration
+
+      - name: Upload coverage reports to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20 && always()
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
+
+      - name: Setup Blackfire
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20 && steps.blackfire.outputs.enabled == 'true'
+        uses: shivammathur/setup-php@v2
+        with:
+          tools: blackfire
+        env:
+          BLACKFIRE_SERVER_ID: ${{ secrets.BLACKFIRE_SERVER_ID }}
+          BLACKFIRE_SERVER_TOKEN: ${{ secrets.BLACKFIRE_SERVER_TOKEN }}
+          BLACKFIRE_CLIENT_ID: ${{ secrets.BLACKFIRE_CLIENT_ID }}
+          BLACKFIRE_CLIENT_TOKEN: ${{ secrets.BLACKFIRE_CLIENT_TOKEN }}
+
+      - name: Run Blackfire profile
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20 && steps.blackfire.outputs.enabled == 'true'
+        run: blackfire run node scripts/blackfire-profile.js
+
+      - name: Skip Blackfire profile
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20 && steps.blackfire.outputs.enabled != 'true'
+        run: echo "Blackfire secrets are not configured; skipping Blackfire profiling."
       
       - name: Skip integration tests (Windows - FAISS not installed)
         if: matrix.os == 'windows-latest'

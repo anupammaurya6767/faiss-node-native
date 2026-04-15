@@ -1045,6 +1045,24 @@ npm test              # All tests
 npm run test:unit     # Unit tests only
 npm run test:integration  # Integration tests only
 npm run test:ci       # CI tests (faster, no manual tests)
+npm run profile:blackfire  # Deterministic profiling workload used by Blackfire in CI
+```
+
+### CI Coverage And Profiling
+
+The GitHub Actions CI workflow uploads Jest coverage to Codecov from the `ubuntu-latest` / `Node 20` job. To enable it, add this repository secret:
+
+```bash
+CODECOV_TOKEN
+```
+
+Blackfire profiling is also wired into that same canonical Linux CI job. The workflow automatically skips the Blackfire step when credentials are not configured. To enable Blackfire in GitHub Actions, add these repository secrets:
+
+```bash
+BLACKFIRE_SERVER_ID
+BLACKFIRE_SERVER_TOKEN
+BLACKFIRE_CLIENT_ID
+BLACKFIRE_CLIENT_TOKEN
 ```
 
 ### Generating Documentation

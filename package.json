@@ -85,6 +85,7 @@
     "test:ci": "jest --ci --coverage --config=jest.ci.config.js --testPathIgnorePatterns=manual",
     "test:unit": "jest test/unit",
     "test:integration": "jest test/integration",
+    "profile:blackfire": "node scripts/blackfire-profile.js",
     "test:watch": "jest --watch",
     "test:memory": "node --expose-gc test/memory.test.js",
     "test:local": "npm run clean && npm run build && npm test",
