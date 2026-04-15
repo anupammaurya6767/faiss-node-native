@@ -472,6 +472,14 @@ jobs:
       - name: Run integration tests (macOS/Linux)
         if: matrix.os != 'windows-latest'
         run: npm run test:integration
+
+      - name: Upload coverage reports to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20 && always()
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
       
       - name: Skip integration tests (Windows - FAISS not installed)
         if: matrix.os == 'windows-latest'
